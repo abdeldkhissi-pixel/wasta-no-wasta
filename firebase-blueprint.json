@@ -1,0 +1,228 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered user account profile (Particulier or Prestataire)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "city": { "type": "string", "maxLength": 50 },
+        "accountType": { "type": "string", "enum": ["particulier", "prestataire"] },
+        "profileImage": { "type": "string", "maxLength": 100000 },
+        "accountStatus": { "type": "string", "enum": ["active", "suspended"] },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "fullName", "email", "accountType", "accountStatus", "city"]
+    },
+    "ProviderProfile": {
+      "title": "ProviderProfile",
+      "description": "Professional and talent profile for service providers",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "professionalTitle": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "categories": { "type": "array" },
+        "skills": { "type": "array" },
+        "experience": { "type": "string", "maxLength": 500 },
+        "city": { "type": "string", "maxLength": 50 },
+        "serviceArea": { "type": "string", "maxLength": 150 },
+        "availability": { "type": "string", "maxLength": 100 },
+        "profileCompleted": { "type": "boolean" },
+        "isPublished": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "profileImage": { "type": "string", "maxLength": 100000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "fullName", "city", "profileCompleted", "isPublished"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Service offered by a registered provider",
+      "type": "object",
+      "properties": {
+        "serviceId": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 2500 },
+        "category": { "type": "string", "maxLength": 60 },
+        "price": { "type": "number" },
+        "pricingType": { "type": "string", "enum": ["Fixe", "Par heure", "Négociable"] },
+        "city": { "type": "string", "maxLength": 50 },
+        "images": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "unpublished", "flagged"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["serviceId", "providerId", "title", "category", "price", "city", "status"]
+    },
+    "ServiceRequest": {
+      "title": "ServiceRequest",
+      "description": "Job or mission request published by a particulier",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string", "maxLength": 100 },
+        "clientAvatar": { "type": "string", "maxLength": 100000 },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 2500 },
+        "category": { "type": "string", "maxLength": 60 },
+        "city": { "type": "string", "maxLength": 50 },
+        "neighborhood": { "type": "string", "maxLength": 100 },
+        "budget": { "type": "number" },
+        "preferredDate": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["open", "in_progress", "completed", "cancelled"] },
+        "proposalsCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["requestId", "clientId", "title", "description", "category", "city", "status"]
+    },
+    "Proposal": {
+      "title": "Proposal",
+      "description": "Price offer submitted by a provider to a client's request",
+      "type": "object",
+      "properties": {
+        "proposalId": { "type": "string" },
+        "requestId": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string", "maxLength": 100 },
+        "providerAvatar": { "type": "string", "maxLength": 100000 },
+        "clientId": { "type": "string" },
+        "proposedPrice": { "type": "number" },
+        "message": { "type": "string", "maxLength": 1000 },
+        "eta": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "completed"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["proposalId", "requestId", "providerId", "clientId", "proposedPrice", "status"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Direct message conversation thread between two users",
+      "type": "object",
+      "properties": {
+        "conversationId": { "type": "string" },
+        "participants": { "type": "array" },
+        "participantNames": { "type": "object" },
+        "lastMessage": { "type": "string", "maxLength": 500 },
+        "lastSenderId": { "type": "string" },
+        "lastMessageId": { "type": "string" },
+        "unreadCounts": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["conversationId", "participants"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Individual message within a conversation",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "content": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string" },
+        "createdAtIso": { "type": "string" },
+        "readStatus": { "type": "boolean" },
+        "isEdited": { "type": "boolean" },
+        "editedAt": { "type": "string" }
+      },
+      "required": ["messageId", "conversationId", "senderId", "content", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Feedback and star rating for a completed service",
+      "type": "object",
+      "properties": {
+        "reviewId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string", "maxLength": 100 },
+        "providerId": { "type": "string" },
+        "serviceId": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["reviewId", "clientId", "providerId", "rating", "comment", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Public comments and community opinions on services, providers, or requests",
+      "type": "object",
+      "properties": {
+        "commentId": { "type": "string" },
+        "parentId": { "type": "string" },
+        "parentType": { "type": "string", "enum": ["service", "request", "provider"] },
+        "userId": { "type": "string" },
+        "userName": { "type": "string", "maxLength": 100 },
+        "userAvatar": { "type": "string", "maxLength": 100000 },
+        "content": { "type": "string", "maxLength": 1500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["commentId", "parentId", "parentType", "userId", "userName", "content", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "System administrator record for RBAC",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile documents keyed by Auth UID"
+    },
+    "/provider_profiles/{providerId}": {
+      "schema": { "$ref": "#/entities/ProviderProfile" },
+      "description": "Professional profile documents for prestataires"
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Catalog of published services"
+    },
+    "/service_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/ServiceRequest" },
+      "description": "Client job requests"
+    },
+    "/proposals/{proposalId}": {
+      "schema": { "$ref": "#/entities/Proposal" },
+      "description": "Provider quotes and bids for service requests"
+    },
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Direct message chat threads"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Individual messages in a chat thread"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Ratings and reviews left by clients"
+    },
+    "/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Comments and interactions left by users"
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Administrator UID documents for server and rule checks"
+    }
+  }
+}

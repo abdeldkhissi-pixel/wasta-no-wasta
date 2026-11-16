@@ -1,0 +1,51 @@
+{
+  "id": "/",
+  "name": "Wasta No - Services & Talents Maroc",
+  "short_name": "Wasta No",
+  "description": "Plateforme marocaine de mise en relation directe pour services, artisans et étudiants à Fès et Meknès.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0F2942",
+  "background_color": "#0F2942",
+  "lang": "fr-MA",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "business",
+    "lifestyle",
+    "productivity",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Trouver un service",
+      "url": "/?tab=explorer",
+      "description": "Rechercher un artisan ou un prestataire à Fès et Meknès"
+    },
+    {
+      "name": "Publier une demande",
+      "url": "/?action=new-request",
+      "description": "Poster un besoin pour recevoir des offres"
+    }
+  ]
+}

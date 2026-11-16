@@ -1,0 +1,14 @@
+{
+  "appId": "ma.wastano.app",
+  "appName": "Wasta No",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}

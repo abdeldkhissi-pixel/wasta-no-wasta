@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wasta No</string>
+    <string name="title_activity_main">Wasta No</string>
+    <string name="package_name">ma.wastano.app</string>
+    <string name="custom_url_scheme">ma.wastano.app</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "Wasta No - Services & Talents Maroc",
+  "description": "Plateforme marocaine de mise en relation pour services à domicile, artisans et talents étudiants à Fès et Meknès sans intermédiaire.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
