@@ -97,34 +97,34 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100 dark:border-slate-800">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h3 className="text-base font-black text-[#0F2942]">
+            <h3 className="text-base font-black text-[#0F2942] dark:text-white">
               {providerProfile.profileCompleted 
                 ? (isAr ? 'تعديل ملفي المهني' : 'Modifier mon profil professionnel') 
                 : (isAr ? 'إكمال الملف المهني للمزود' : 'Compléter mon profil prestataire')}
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {isAr ? 'حدد مهاراتك لتظهر مباشرة للزبناء في مدينتك.' : 'Renseignez vos compétences pour être visible auprès des clients de votre ville.'}
             </p>
           </div>
-          <button onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Fermer'} className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer">
+          <button onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Fermer'} className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs">
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 rounded-xl text-xs">
             {errorMsg}
           </div>
         )}
 
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
               {isAr ? 'المسمى المهني / الحرفة *' : 'Titre professionnel / Métier *'}
             </label>
             <input
@@ -132,13 +132,13 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
               value={professionalTitle}
               onChange={e => setProfessionalTitle(e.target.value)}
               placeholder={isAr ? "مثال: معلم سباك وتدفئة مركزية، مصمم كانفا، كهربائي منازل..." : "Ex: Maître Plombier & Chauffagiste certifié, Designer Canva, etc."}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               required
             />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
               {isAr ? 'أقسام الخدمات المقدمة *' : 'Catégories de prestations proposées *'}
             </label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -151,13 +151,13 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
                     onClick={() => toggleCategory(cat.name)}
                     className={`p-2 rounded-xl text-left text-xs font-semibold border flex items-center gap-2 transition-all cursor-pointer ${
                       isSelected 
-                        ? 'bg-blue-50 border-[#2563EB] text-[#0F2942]' 
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 border-[#2563EB] text-[#0F2942] dark:text-blue-200' 
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/70'
                     }`}
                   >
                     <span>{cat.icon}</span>
                     <span className="truncate">{getCategoryTranslation(cat.name, language).name}</span>
-                    {isSelected && <Check className={`w-3.5 h-3.5 text-[#2563EB] shrink-0 ${isAr ? 'mr-auto' : 'ml-auto'}`} />}
+                    {isSelected && <Check className={`w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400 shrink-0 ${isAr ? 'mr-auto' : 'ml-auto'}`} />}
                   </button>
                 );
               })}
@@ -165,7 +165,7 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
               {isAr ? 'نبذة عن خدماتك وخبرتك *' : 'Description de vos services et expérience *'}
             </label>
             <textarea
@@ -173,20 +173,20 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
               onChange={e => setDescription(e.target.value)}
               placeholder={isAr ? 'اذكر مسارك المهني، ضماناتك، معداتك وطريقة تعاملك...' : "Présentez votre parcours, vos garanties, votre matériel et vos méthodes de travail..."}
               rows={3}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'المدينة الرئيسية *' : 'Ville principale *'}
               </label>
               <select
                 value={city}
                 onChange={e => setCity(e.target.value as MoroccanCity)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none cursor-pointer"
+                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none cursor-pointer"
               >
                 {MOROCCAN_CITIES.map(c => (
                   <option key={c} value={c}>
@@ -197,7 +197,7 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'منطقة التدخل بالأحياء' : "Zone d'intervention"}
               </label>
               <input
@@ -205,14 +205,14 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
                 value={serviceArea}
                 onChange={e => setServiceArea(e.target.value)}
                 placeholder={isAr ? "مثال: المدينة الجديدة، النرجس، الأطلس..." : "Ex: Fès Ville Nouvelle, Narjiss, Atlas..."}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'سنوات الخبرة' : "Années d'expérience"}
               </label>
               <input
@@ -220,12 +220,12 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
                 value={experience}
                 onChange={e => setExperience(e.target.value)}
                 placeholder={isAr ? "مثال: 5 سنوات، طالب سنة ثانية..." : "Ex: 5 ans, Étudiante 2e année..."}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'أوقات العمل والتفرغ' : 'Disponibilité'}
               </label>
               <input
@@ -233,13 +233,13 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
                 value={availability}
                 onChange={e => setAvailability(e.target.value)}
                 placeholder={isAr ? "مثال: 7/7 أيام، المساء وعطلة الأسبوع..." : "Ex: 7j/7, Soirées & Weekends..."}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
               {isAr ? 'المهارات الرئيسية (مفصولة بفواصل)' : 'Compétences clés (séparées par des virgules)'}
             </label>
             <input
@@ -247,17 +247,17 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
               value={skillsText}
               onChange={e => setSkillsText(e.target.value)}
               placeholder={isAr ? "مثال: كشف التسربات، سخان الماء، تجديد، كانفا برو..." : "Ex: Recherche de fuite, Chauffe-eau, Rénovation, Canva Pro..."}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+              className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none"
             />
           </div>
 
           {/* Visibility toggle */}
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold text-slate-900 block">
+              <span className="text-xs font-bold text-slate-900 dark:text-white block">
                 {isAr ? 'نشر الملف المهني لعموم الزبناء' : 'Publier mon profil professionnel'}
               </span>
-              <span className="text-[11px] text-slate-500 block">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                 {isPublished 
                   ? (isAr ? 'ملفك ظاهر ومتاح حالياً في نتائج البحث وتصفح الزبناء.' : 'Votre profil est actuellement visible dans les résultats de recherche.') 
                   : (isAr ? 'ملفك خاص ولن يظهر في نتائج البحث حتى تقوم بتفعيله.' : 'Votre profil est actuellement privé et n’apparaît pas dans la recherche.')}
@@ -270,7 +270,7 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
                 onChange={e => setIsPublished(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
             </label>
           </div>
 
@@ -278,7 +278,7 @@ export const PrestataireProfileEditorModal: React.FC<PrestataireProfileEditorMod
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
             >
               {isAr ? 'إلغاء' : 'Annuler'}
             </button>

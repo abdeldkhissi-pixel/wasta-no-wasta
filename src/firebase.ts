@@ -1,6 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
@@ -32,6 +35,11 @@ const app = initializeApp(firebaseConfig);
 // CRITICAL: Ensure firestoreDatabaseId is passed as required by AI Studio Firebase specification
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// Keep user authenticated across browser/app restarts until explicit logout
+setPersistence(auth, browserLocalPersistence).catch(() => {
+  setPersistence(auth, browserSessionPersistence).catch(() => {});
+});
 
 // Error Handling Infrastructure as required by firebase-integration-rpc
 export enum OperationType {

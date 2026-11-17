@@ -49,12 +49,14 @@ import {
   Briefcase, GraduationCap, Users, Filter, ChevronRight, AlertTriangle,
   SlidersHorizontal, Phone, Check, RefreshCw, Bell, BellRing, Globe, Sparkles,
   Lock, LogOut, Edit3, CheckCircle, Shield, AlertCircle, Loader2,
-  Eye, FileText, Pencil, Trash2, X, Camera, Mic, Paperclip, Video, Heart, Map, PhoneCall, Play, Square
+  Eye, FileText, Pencil, Trash2, X, Camera, Mic, Paperclip, Video, Heart, Map, PhoneCall, Play, Square,
+  Wrench, Palette, Laptop, Truck, Zap, Sun, Moon
 } from 'lucide-react';
 
 export default function App() {
   // App Lifecycle States
   const [showSplash, setShowSplash] = useState(true);
+  const [splashFinished, setSplashFinished] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAccountTypeSelect, setShowAccountTypeSelect] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -76,10 +78,17 @@ export default function App() {
   const [reviews, setReviews] = useState<ReviewDoc[]>([]);
   const [comments, setComments] = useState<CommentDoc[]>([]);
 
-  // Navigation & Localization
+  // Navigation, Theme & Localization
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'publish' | 'messages' | 'profile'>('home');
+  const [discoveryTab, setDiscoveryTab] = useState<'services' | 'requests'>('services');
   const [selectedCity, setSelectedCity] = useState<MoroccanCity>('Fès');
   const [language, setLanguage] = useState<'fr' | 'ar'>('fr');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wasta_theme') === 'dark') {
+      return 'dark';
+    }
+    return 'light';
+  });
 
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,16 +188,24 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    localStorage.setItem('wasta_theme', theme);
+  }, [theme]);
+
   // Test Firestore Connection on Boot
   useEffect(() => {
     testConnection();
   }, []);
 
-  // 1. Listen to Real Firebase Auth State
+  // 1. Listen to Real Firebase Auth State (persisted until explicit logout)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setAuthLoading(true);
       if (firebaseUser) {
+        localStorage.setItem('wasta_onboarding_done', 'true');
+        setShowAccountTypeSelect(false);
         try {
           let userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (!userSnap.exists()) {
@@ -404,19 +421,28 @@ export default function App() {
   // Handle Splash Screen finish
   const handleFinishSplash = () => {
     setShowSplash(false);
+    setSplashFinished(true);
+  };
+
+  // Only show first-time onboarding after auth state is resolved and no user is signed in
+  useEffect(() => {
+    if (!splashFinished || authLoading) return;
+    if (currentUser || auth.currentUser) {
+      setShowOnboarding(false);
+      setShowAccountTypeSelect(false);
+      return;
+    }
     const hasSeenOnboarding = localStorage.getItem('wasta_onboarding_done');
     if (!hasSeenOnboarding) {
       setShowOnboarding(true);
-    } else if (!auth.currentUser) {
-      setShowAccountTypeSelect(true);
     }
-  };
+  }, [splashFinished, authLoading, currentUser]);
 
-  // Handle Onboarding finish -> prompt account type selection
+  // Handle Onboarding finish -> prompt account type selection only if still signed out
   const handleFinishOnboarding = () => {
     localStorage.setItem('wasta_onboarding_done', 'true');
     setShowOnboarding(false);
-    if (!auth.currentUser) {
+    if (!authLoading && !auth.currentUser && !currentUser) {
       setShowAccountTypeSelect(true);
     }
   };
@@ -620,12 +646,12 @@ export default function App() {
       if (srv.status === 'unpublished' || srv.status === 'flagged') return false;
       const matchCity = srv.city === selectedCity;
       const matchCategory = filterCategory === 'all' || srv.category === filterCategory;
-      const query = searchQuery.toLowerCase().trim();
-      const matchSearch = !query || 
-        srv.title.toLowerCase().includes(query) ||
-        srv.providerName.toLowerCase().includes(query) ||
-        srv.description.toLowerCase().includes(query) ||
-        srv.category.toLowerCase().includes(query);
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = !q || 
+        srv.title.toLowerCase().includes(q) ||
+        srv.providerName.toLowerCase().includes(q) ||
+        srv.description.toLowerCase().includes(q) ||
+        srv.category.toLowerCase().includes(q);
       const matchPrice = srv.price <= maxPriceFilter;
       return matchCity && matchCategory && matchSearch && matchPrice;
     }).sort((a, b) => {
@@ -634,6 +660,27 @@ export default function App() {
       return 0;
     });
   }, [services, selectedCity, filterCategory, searchQuery, maxPriceFilter, sortBy]);
+
+  // Filtered Client Requests Calculation from Real Firestore
+  const filteredRequests = useMemo(() => {
+    return requests.filter(req => {
+      if (req.status !== 'open') return false;
+      const matchCity = req.city === selectedCity;
+      const matchCategory = filterCategory === 'all' || req.category === filterCategory;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = !q ||
+        req.title.toLowerCase().includes(q) ||
+        req.clientName.toLowerCase().includes(q) ||
+        req.description.toLowerCase().includes(q) ||
+        req.category.toLowerCase().includes(q);
+      const matchPrice = req.budget <= maxPriceFilter;
+      return matchCity && matchCategory && matchSearch && matchPrice;
+    }).sort((a, b) => {
+      if (sortBy === 'priceAsc') return a.budget - b.budget;
+      if (sortBy === 'recent') return (b.createdAt || '').localeCompare(a.createdAt || '');
+      return 0;
+    });
+  }, [requests, selectedCity, filterCategory, searchQuery, maxPriceFilter, sortBy]);
 
   // Accept Proposal flow (Real DB mutation)
   const handleAcceptProposal = async (proposal: ProposalDoc) => {
@@ -806,18 +853,18 @@ export default function App() {
   return (
     <div 
       dir={language === 'ar' ? 'rtl' : 'ltr'} 
-      className="min-h-screen bg-slate-100 flex flex-col items-center text-slate-800 font-sans selection:bg-blue-100"
+      className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col items-center text-slate-800 dark:text-slate-100 font-sans selection:bg-blue-100 dark:selection:bg-blue-900 transition-colors"
     >
       {/* ----------------- SPLASH SCREEN ----------------- */}
       {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
 
       {/* ----------------- TOP UTILITY STRIP ----------------- */}
-      <aside aria-label="Contrôles utilisateur" className="w-full max-w-4xl px-4 py-2 flex items-center justify-between text-xs text-slate-500 border-b border-slate-200/60 bg-white/70 backdrop-blur-sm">
+      <aside aria-label="Contrôles utilisateur" className="w-full max-w-4xl px-4 py-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           {currentUser ? (
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-slate-700 dark:text-slate-200">
                 {currentUser.fullName} ({currentUser.accountType === 'prestataire'
                   ? (language === 'ar' ? 'مقدم خدمات' : 'Prestataire')
                   : (language === 'ar' ? 'زبون' : 'Particulier')})
@@ -825,7 +872,7 @@ export default function App() {
               {isAdmin && (
                 <button
                   onClick={() => setShowAdminDashboard(true)}
-                  className="px-2 py-0.5 bg-[#0F2942] text-white rounded text-[10px] font-bold hover:bg-[#1E3A8A] transition-all ml-1 cursor-pointer"
+                  className="px-2 py-0.5 bg-[#0F2942] dark:bg-[#2563EB] text-white rounded text-[10px] font-bold hover:bg-[#1E3A8A] transition-all ml-1 cursor-pointer"
                 >
                   {language === 'ar' ? 'لوحة الإدارة' : 'Console Admin'}
                 </button>
@@ -835,14 +882,14 @@ export default function App() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setAuthModalMode('login'); setShowAuthModal(true); }}
-                className="text-[#2563EB] font-bold hover:underline cursor-pointer"
+                className="text-[#2563EB] dark:text-blue-400 font-bold hover:underline cursor-pointer"
               >
                 {language === 'ar' ? 'تسجيل الدخول' : 'Se connecter'}
               </button>
               <span>·</span>
               <button
                 onClick={() => setShowAccountTypeSelect(true)}
-                className="text-slate-600 font-bold hover:underline cursor-pointer"
+                className="text-slate-600 dark:text-slate-300 font-bold hover:underline cursor-pointer"
               >
                 {language === 'ar' ? 'إنشاء حساب' : 'Créer un compte'}
               </button>
@@ -858,9 +905,9 @@ export default function App() {
               setLanguage(nextLang);
               showToast(nextLang === 'ar' ? 'تم تحويل التطبيق بالكامل إلى اللغة العربية' : 'Application passée en Français');
             }}
-            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold text-[11px] cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 font-bold text-[11px] cursor-pointer"
           >
-            <Globe className="w-3.5 h-3.5 text-[#2563EB]" />
+            <Globe className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
             <span>{language === 'fr' ? 'العربية' : 'Français'}</span>
           </button>
         </div>
@@ -868,7 +915,7 @@ export default function App() {
 
       {/* ----------------- APP CANVAS ----------------- */}
       <div 
-        className={`w-full max-w-md my-0 sm:my-3 shadow-2xl sm:rounded-3xl border border-slate-200 bg-white min-h-[92vh] flex flex-col relative pb-20 overflow-hidden ${
+        className={`w-full max-w-md my-0 sm:my-3 shadow-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 min-h-[92vh] flex flex-col relative pb-20 overflow-hidden transition-colors ${
           language === 'ar' ? 'font-[\'Noto_Sans_Arabic\',sans-serif]' : ''
         }`}
         dir={language === 'ar' ? 'rtl' : 'ltr'}
@@ -918,28 +965,28 @@ export default function App() {
         )}
 
         {/* ----------------- TOP STICKY BAR ----------------- */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 px-3.5 py-2.5 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-3.5 py-2.5 flex items-center justify-between">
           <div 
             onClick={() => { setShowAdminDashboard(false); setActiveTab('home'); }}
             className="cursor-pointer"
           >
-            <WastaLogo size="sm" showSlogan={false} language={language} />
+            <WastaLogo size="sm" showSlogan={false} inverted={theme === 'dark'} language={language} />
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             {/* City Selector */}
-            <div className="flex items-center bg-slate-100 rounded-xl px-2 py-1 text-xs font-semibold text-slate-700 max-w-[125px]">
-              <MapPin className="w-3.5 h-3.5 text-[#2563EB] mr-1 shrink-0" />
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 max-w-[125px]">
+              <MapPin className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400 mr-1 shrink-0" />
               <select 
                 value={selectedCity} 
                 onChange={(e) => {
                   setSelectedCity(e.target.value as MoroccanCity);
                   showToast(language === 'ar' ? `المدينة المختارة : ${getCityTranslation(e.target.value, 'ar')}` : `Ville sélectionnée : ${e.target.value}`);
                 }}
-                className="bg-transparent border-none text-xs font-bold focus:outline-none cursor-pointer truncate w-full"
+                className="bg-transparent border-none text-xs font-bold focus:outline-none cursor-pointer truncate w-full dark:text-slate-100"
               >
                 {MOROCCAN_CITIES.map(c => (
-                  <option key={c} value={c}>{getCityTranslation(c, language)}</option>
+                  <option key={c} value={c} className="dark:bg-slate-900 dark:text-slate-100">{getCityTranslation(c, language)}</option>
                 ))}
               </select>
             </div>
@@ -957,14 +1004,14 @@ export default function App() {
                     setActiveTab('messages');
                   }
                 }}
-                className="relative p-1.5 bg-slate-100 hover:bg-blue-50 text-[#0F2942] rounded-xl border border-slate-200 cursor-pointer transition-all"
+                className="relative p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-[#0F2942] dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer transition-all"
                 title={language === 'ar' ? 'إشعارات الرسائل' : 'Notifications de messages'}
                 aria-label={language === 'ar' ? 'إشعارات الرسائل' : 'Notifications'}
               >
                 {totalUnreadCount > 0 ? (
-                  <BellRing className="w-4 h-4 text-[#2563EB] animate-pulse" />
+                  <BellRing className="w-4 h-4 text-[#2563EB] dark:text-blue-400 animate-pulse" />
                 ) : (
-                  <Bell className="w-4 h-4 text-slate-600" />
+                  <Bell className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                 )}
                 {totalUnreadCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shadow-sm">
@@ -981,7 +1028,7 @@ export default function App() {
                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg cursor-pointer"
                 title={language === 'ar' ? "لوحة الإدارة" : "Console Administration"}
               >
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
               </button>
             )}
           </div>
@@ -989,9 +1036,9 @@ export default function App() {
 
         {/* Prestataire Incomplete Profile Alert Banner */}
         {currentUser?.accountType === 'prestataire' && (!providerProfile || !providerProfile.profileCompleted) && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between text-xs text-amber-900">
+          <div className="bg-amber-50 dark:bg-amber-950/60 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
               <span className="font-semibold text-[11px] leading-tight">
                 {language === 'ar' 
                   ? `أكمل ملفك المهني لتكون مرئياً للزبناء في ${getCityTranslation(selectedCity, 'ar')}.`
@@ -1000,7 +1047,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setShowProfileEditor(true)}
-              className="text-[11px] font-bold text-amber-800 bg-amber-200/80 px-2 py-1 rounded-lg shrink-0 ml-2 hover:bg-amber-300 cursor-pointer"
+              className="text-[11px] font-bold text-amber-800 dark:text-amber-950 bg-amber-200/80 dark:bg-amber-400 px-2 py-1 rounded-lg shrink-0 ml-2 hover:bg-amber-300 cursor-pointer"
             >
               {language === 'ar' ? 'إكمال' : 'Compléter'}
             </button>
@@ -1019,64 +1066,38 @@ export default function App() {
               {activeTab === 'home' && (
                 <HomeView 
                   currentUser={currentUser}
-                  providerProfile={providerProfile}
                   selectedCity={selectedCity}
                   services={services}
                   requests={requests}
                   language={language}
                   onSelectCategory={(cat) => {
                     setFilterCategory(cat);
+                    setDiscoveryTab('services');
                     setActiveTab('search');
                   }}
-                  onOpenService={(srv) => {
-                    // Open service provider profile
-                    const pDoc: ProviderProfileDoc = {
-                      userId: srv.providerId,
-                      fullName: srv.providerName,
-                      professionalTitle: srv.title,
-                      description: srv.description,
-                      categories: [srv.category],
-                      skills: [],
-                      experience: '',
-                      city: srv.city,
-                      serviceArea: srv.city,
-                      availability: 'Disponible',
-                      profileCompleted: true,
-                      isPublished: true,
-                      isVerified: false,
-                      rating: 5.0,
-                      reviewCount: 0,
-                      serviceId: srv.serviceId,
-                      likesCount: srv.likesCount || 0,
-                      likedBy: srv.likedBy || [],
-                      createdAt: srv.createdAt,
-                      updatedAt: srv.createdAt
-                    };
-                    setActiveDetailProvider(pDoc);
+                  onOpenAvailableServices={() => {
+                    setFilterCategory('all');
+                    setDiscoveryTab('services');
+                    setActiveTab('search');
                   }}
-                  onOpenRequest={(req) => setActiveRequestDetail(req)}
-                  onQuickPublishClick={() => {
-                    if (!currentUser) {
-                      setAuthModalMode('login');
-                      setShowAuthModal(true);
-                      showToast('Veuillez vous connecter pour publier.', 'info');
-                      return;
-                    }
-                    if (currentUser.accountType === 'prestataire') {
-                      setPublishMode('service');
-                    } else {
-                      setPublishMode('request');
-                    }
-                    setIsPublishModalOpen(true);
+                  onOpenClientRequests={() => {
+                    setFilterCategory('all');
+                    setDiscoveryTab('requests');
+                    setActiveTab('search');
                   }}
-                  onNavigateSearch={() => setActiveTab('search')}
-                  onOpenProfileEditor={() => setShowProfileEditor(true)}
+                  onNavigateSearch={() => {
+                    setDiscoveryTab('services');
+                    setActiveTab('search');
+                  }}
                 />
               )}
 
               {activeTab === 'search' && (
                 <SearchView 
                   services={filteredServices}
+                  requests={filteredRequests}
+                  discoveryTab={discoveryTab}
+                  setDiscoveryTab={setDiscoveryTab}
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
                   filterCategory={filterCategory}
@@ -1113,6 +1134,17 @@ export default function App() {
                       updatedAt: srv.createdAt
                     };
                     setActiveDetailProvider(pDoc);
+                  }}
+                  onSelectRequest={(req) => setActiveRequestDetail(req)}
+                  onQuickPublishRequest={() => {
+                    if (!currentUser) {
+                      setAuthModalMode('login');
+                      setShowAuthModal(true);
+                      showToast(language === 'ar' ? 'يرجى تسجيل الدخول للنشر.' : 'Veuillez vous connecter pour publier.', 'info');
+                      return;
+                    }
+                    setPublishMode('request');
+                    setIsPublishModalOpen(true);
                   }}
                 />
               )}
@@ -1167,6 +1199,16 @@ export default function App() {
                   onLogout={handleLogout}
                   language={language}
                   setLanguage={setLanguage}
+                  theme={theme}
+                  setTheme={(next) => {
+                    setTheme(next);
+                    showToast(
+                      language === 'ar'
+                        ? (next === 'dark' ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع الفاتح')
+                        : (next === 'dark' ? 'Thème sombre activé' : 'Thème clair activé'),
+                      'info'
+                    );
+                  }}
                 />
               )}
             </>
@@ -1174,7 +1216,7 @@ export default function App() {
         </main>
 
         {/* ----------------- BOTTOM NAV DOCK ----------------- */}
-        <nav className="fixed bottom-0 w-full max-w-inherit bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-1.5 flex items-center justify-around z-40 shadow-lg">
+        <nav className="fixed bottom-0 w-full max-w-inherit bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-3 py-1.5 flex items-center justify-around z-40 shadow-lg">
           <NavButton 
             icon={<Home className="w-5 h-5" />} 
             label={language === 'ar' ? 'الرئيسية' : 'Accueil'} 
@@ -1195,7 +1237,7 @@ export default function App() {
               if (!currentUser) {
                 setAuthModalMode('login');
                 setShowAuthModal(true);
-                showToast('Connectez-vous pour publier.', 'info');
+                showToast(language === 'ar' ? 'يرجى تسجيل الدخول للنشر.' : 'Connectez-vous pour publier.', 'info');
                 return;
               }
               if (currentUser.accountType === 'prestataire') {
@@ -1205,13 +1247,13 @@ export default function App() {
               }
               setIsPublishModalOpen(true);
             }}
-            className="flex flex-col items-center justify-center -mt-5 group"
+            className="flex flex-col items-center justify-center -mt-5 group cursor-pointer"
             aria-label="Publier"
           >
-            <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#0F2942] via-[#2563EB] to-emerald-500 text-white flex items-center justify-center shadow-xl group-hover:scale-105 transition-all border-3 border-white">
+            <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#0F2942] via-[#2563EB] to-emerald-500 text-white flex items-center justify-center shadow-xl group-hover:scale-105 transition-all border-3 border-white dark:border-slate-900">
               <PlusCircle className="w-6 h-6 stroke-[2.5]" />
             </div>
-            <span className="text-[10px] font-extrabold text-[#0F2942] mt-1">
+            <span className="text-[10px] font-extrabold text-[#0F2942] dark:text-slate-200 mt-1">
               {language === 'ar' ? 'نشر' : 'Publier'}
             </span>
           </button>
@@ -1593,7 +1635,9 @@ function NavButton({ icon, label, active, onClick, badge }: {
     <button 
       onClick={onClick}
       className={`flex flex-col items-center justify-center flex-1 py-1 transition-all relative cursor-pointer ${
-        active ? 'text-[#0F2942] font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+        active
+          ? 'text-[#0F2942] dark:text-blue-400 font-bold'
+          : 'text-slate-400 dark:text-slate-500 font-medium hover:text-slate-600 dark:hover:text-slate-300'
       }`}
     >
       <div className="relative">
@@ -1605,9 +1649,71 @@ function NavButton({ icon, label, active, onClick, badge }: {
         )}
       </div>
       <span className="text-[10px] mt-0.5 tracking-tight">{label}</span>
-      {active && <div className="w-3.5 h-0.5 bg-[#2563EB] rounded-full mt-0.5" />}
+      {active && <div className="w-3.5 h-0.5 bg-[#2563EB] dark:bg-blue-400 rounded-full mt-0.5" />}
     </button>
   );
+}
+
+function getCategoryVisual(category: ServiceCategory) {
+  switch (category) {
+    case 'Maison & Réparation':
+      return {
+        Icon: Wrench,
+        gradient: 'from-blue-500 to-indigo-600',
+        ring: 'ring-blue-500/20 dark:ring-blue-400/25',
+        cardHover: 'hover:border-blue-400 dark:hover:border-blue-500/60',
+      };
+    case 'Digital & Créatif':
+      return {
+        Icon: Palette,
+        gradient: 'from-fuchsia-500 to-rose-600',
+        ring: 'ring-fuchsia-500/20 dark:ring-fuchsia-400/25',
+        cardHover: 'hover:border-fuchsia-400 dark:hover:border-fuchsia-500/60',
+      };
+    case 'Cours & Formation':
+      return {
+        Icon: GraduationCap,
+        gradient: 'from-emerald-500 to-teal-600',
+        ring: 'ring-emerald-500/20 dark:ring-emerald-400/25',
+        cardHover: 'hover:border-emerald-400 dark:hover:border-emerald-500/60',
+      };
+    case 'Ménage':
+      return {
+        Icon: Sparkles,
+        gradient: 'from-cyan-500 to-sky-600',
+        ring: 'ring-cyan-500/20 dark:ring-cyan-400/25',
+        cardHover: 'hover:border-cyan-400 dark:hover:border-cyan-500/60',
+      };
+    case 'Informatique':
+      return {
+        Icon: Laptop,
+        gradient: 'from-indigo-500 to-violet-600',
+        ring: 'ring-indigo-500/20 dark:ring-indigo-400/25',
+        cardHover: 'hover:border-indigo-400 dark:hover:border-indigo-500/60',
+      };
+    case 'Transport & Livraison':
+      return {
+        Icon: Truck,
+        gradient: 'from-amber-500 to-orange-600',
+        ring: 'ring-amber-500/20 dark:ring-amber-400/25',
+        cardHover: 'hover:border-amber-400 dark:hover:border-amber-500/60',
+      };
+    case 'Événementiel':
+      return {
+        Icon: Camera,
+        gradient: 'from-rose-500 to-pink-600',
+        ring: 'ring-rose-500/20 dark:ring-rose-400/25',
+        cardHover: 'hover:border-rose-400 dark:hover:border-rose-500/60',
+      };
+    case 'Autres services':
+    default:
+      return {
+        Icon: Zap,
+        gradient: 'from-teal-500 to-emerald-600',
+        ring: 'ring-teal-500/20 dark:ring-teal-400/25',
+        cardHover: 'hover:border-teal-400 dark:hover:border-teal-500/60',
+      };
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1615,42 +1721,37 @@ function NavButton({ icon, label, active, onClick, badge }: {
    -------------------------------------------------------------------------- */
 function HomeView({
   currentUser,
-  providerProfile,
   selectedCity,
   services,
   requests,
   language,
   onSelectCategory,
-  onOpenService,
-  onOpenRequest,
-  onQuickPublishClick,
+  onOpenAvailableServices,
+  onOpenClientRequests,
   onNavigateSearch,
-  onOpenProfileEditor
 }: {
   currentUser: UserDoc | null;
-  providerProfile: ProviderProfileDoc | null;
   selectedCity: MoroccanCity;
   services: ServiceDoc[];
   requests: ServiceRequestDoc[];
   language: 'fr' | 'ar';
   onSelectCategory: (cat: ServiceCategory) => void;
-  onOpenService: (srv: ServiceDoc) => void;
-  onOpenRequest: (req: ServiceRequestDoc) => void;
-  onQuickPublishClick: () => void;
+  onOpenAvailableServices: () => void;
+  onOpenClientRequests: () => void;
   onNavigateSearch: () => void;
-  onOpenProfileEditor: () => void;
 }) {
-  const cityServices = services.filter(s => s.city === selectedCity && s.status === 'active');
-  const cityRequests = requests.filter(r => r.city === selectedCity && r.status === 'open');
+  const isAr = language === 'ar';
+  const cityServicesCount = services.filter(s => s.city === selectedCity && s.status === 'active').length;
+  const cityRequestsCount = requests.filter(r => r.city === selectedCity && r.status === 'open').length;
 
   return (
     <div className="space-y-4 pb-6">
       {/* Hero Welcome Card */}
-      <div className="bg-gradient-to-br from-[#0F2942] via-[#153A5F] to-[#2563EB] text-white p-5 rounded-b-3xl shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#0F2942] via-[#153A5F] to-[#2563EB] dark:from-slate-900 dark:via-[#0F2942] dark:to-blue-900 text-white p-5 rounded-b-3xl shadow-lg relative overflow-hidden">
         <div className="flex items-center justify-between mb-2">
           <div>
             <span className="text-[11px] uppercase tracking-wider text-emerald-300 font-bold">
-              {language === 'ar' ? 'مرحباً بك' : 'Marhaban bik'}
+              {isAr ? 'مرحباً بك' : 'Marhaban bik'}
             </span>
             <h1 className="text-xl font-black tracking-tight">
               {currentUser ? currentUser.fullName : 'Wasta No Maroc'}
@@ -1665,15 +1766,64 @@ function HomeView({
           </div>
         </div>
 
-        <p className="text-xs text-slate-200 mb-4 max-w-sm leading-relaxed">
+        <p className="text-xs text-slate-200 mb-3.5 max-w-sm leading-relaxed">
           {currentUser?.accountType === 'prestataire'
-            ? (language === 'ar'
-                ? `حساب مهني : انشر خدماتك وأجب عن طلبات الزبناء في ${getCityTranslation(selectedCity, 'ar')}.`
-                : `Espace Prestataire : Publiez vos services et répondez aux demandes à ${selectedCity}.`)
-            : (language === 'ar'
-                ? `اعثر على حرفي أو موهبة مؤهلة بدون وسيط في ${getCityTranslation(selectedCity, 'ar')}.`
-                : `Trouvez un artisan ou un jeune talent qualifié sans intermédiaire à ${selectedCity}.`)}
+            ? (isAr
+                ? `حساب مهني : اختر القسم المناسب لاستعراض الخدمات والطلبات في ${getCityTranslation(selectedCity, 'ar')}.`
+                : `Espace Prestataire : Explorez les catégories ou consultez les demandes à ${selectedCity}.`)
+            : (isAr
+                ? `اختر قسم الخدمة الذي تحتاجه وتواصل مباشرة بدون وسيط في ${getCityTranslation(selectedCity, 'ar')}.`
+                : `Choisissez une catégorie de service et contactez des talents qualifiés sans intermédiaire à ${selectedCity}.`)}
         </p>
+
+        {/* Enhanced Quick-Access Buttons (Services disponibles & Demandes clients) */}
+        <div className="grid grid-cols-2 gap-2.5 mb-3.5">
+          <button
+            type="button"
+            onClick={onOpenAvailableServices}
+            className="min-h-[48px] px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500/25 to-teal-500/25 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-400/40 backdrop-blur-md flex items-center justify-between gap-2.5 text-left transition-all cursor-pointer active:scale-[0.98] shadow-sm group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
+                <Briefcase className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold block leading-none">
+                  {isAr ? 'عروض' : 'Explorer'}
+                </span>
+                <span className="text-xs font-black text-white leading-tight truncate block mt-0.5">
+                  {isAr ? 'الخدمات المتاحة' : 'Services dispo'}
+                </span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-[11px] font-black text-white shrink-0 border border-emerald-400/40">
+              {cityServicesCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenClientRequests}
+            className="min-h-[48px] px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-500/25 to-indigo-500/25 hover:from-blue-500/35 hover:to-indigo-500/35 border border-blue-400/40 backdrop-blur-md flex items-center justify-between gap-2.5 text-left transition-all cursor-pointer active:scale-[0.98] shadow-sm group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
+                <FileText className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase tracking-wider text-blue-300 font-bold block leading-none">
+                  {isAr ? 'طلبات' : 'Missions'}
+                </span>
+                <span className="text-xs font-black text-white leading-tight truncate block mt-0.5">
+                  {isAr ? 'طلبات الزبناء' : 'Demandes clients'}
+                </span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-full bg-blue-500/30 text-[11px] font-black text-white shrink-0 border border-blue-400/40">
+              {cityRequestsCount}
+            </span>
+          </button>
+        </div>
 
         {/* Search trigger */}
         <div 
@@ -1681,189 +1831,61 @@ function HomeView({
           className="bg-white/10 backdrop-blur-md border border-white/20 p-2.5 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-white/20 transition-all shadow-inner"
         >
           <Search className="w-4 h-4 text-emerald-300 shrink-0" />
-          <span className="text-xs text-slate-200 font-medium truncate">
-            {language === 'ar' ? 'ما هي الخدمة التي تبحث عنها اليوم؟' : 'Quel service recherchez-vous aujourd’hui ?'}
+          <span className="text-xs text-slate-100 font-medium truncate">
+            {isAr ? 'ما هي الخدمة التي تبحث عنها اليوم؟' : 'Quel service recherchez-vous aujourd’hui ?'}
           </span>
         </div>
       </div>
 
-      {/* Categories Grid */}
-      <div className="px-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold text-slate-900 tracking-tight uppercase">
-            {language === 'ar' ? 'أقسام الخدمات' : 'Catégories de services'}
-          </h2>
-          <span className="text-xs text-[#2563EB] font-bold cursor-pointer" onClick={onNavigateSearch}>
-            {language === 'ar' ? 'عرض الكل' : 'Tout voir'}
-          </span>
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {SERVICE_CATEGORIES.map((cat) => (
-            <button
-              key={cat.name}
-              onClick={() => onSelectCategory(cat.name)}
-              className="flex flex-col items-center p-2 bg-slate-50 hover:bg-blue-50 border border-slate-100 rounded-2xl text-center transition-all group cursor-pointer"
-            >
-              <span className="text-xl mb-1 group-hover:scale-110 transition-transform">{cat.icon}</span>
-              <span className="text-[10px] font-semibold text-slate-700 leading-tight line-clamp-2">
-                {getCategoryTranslation(cat.name, language).name}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Real Firestore Services in City */}
-      <div className="px-4 space-y-2.5">
+      {/* Center Section: Exclusively Service Categories with Vivid Professional Vector Icons */}
+      <div className="px-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xs font-bold text-slate-900 tracking-tight uppercase">
-              {language === 'ar' 
-                ? `الخدمات المتاحة في ${getCityTranslation(selectedCity, 'ar')}` 
-                : `Services disponibles à ${selectedCity}`}
+            <h2 className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
+              {isAr ? 'أقسام الخدمات' : 'Catégories de services'}
             </h2>
-            <p className="text-[11px] text-slate-500">
-              {language === 'ar' ? 'عروض مقدمة من حرفيين موثقين' : 'Offres publiées par des prestataires vérifiés'}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {isAr ? `تصفح التخصصات المتوفرة في ${getCityTranslation(selectedCity, 'ar')}` : `Sélectionnez un domaine à ${selectedCity}`}
             </p>
           </div>
-          <span className="text-xs text-[#2563EB] font-bold cursor-pointer" onClick={onNavigateSearch}>
-            {language === 'ar' ? `استكشاف (${cityServices.length})` : `Explorer (${cityServices.length})`}
-          </span>
-        </div>
-
-        {cityServices.length === 0 ? (
-          <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center space-y-2">
-            <Sparkles className="w-8 h-8 text-slate-300 mx-auto" />
-            <h4 className="text-xs font-bold text-slate-700">
-              {language === 'ar' 
-                ? `لا توجد خدمات منشورة حالياً في ${getCityTranslation(selectedCity, 'ar')}` 
-                : `Aucun service publié pour le moment à ${selectedCity}`}
-            </h4>
-            <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-              {language === 'ar' 
-                ? `كن أول حرفي أو طالب ينشر مهاراته وخدماته في ${getCityTranslation(selectedCity, 'ar')}!` 
-                : `Soyez le premier prestataire ou étudiant à publier vos compétences à ${selectedCity} !`}
-            </p>
-            {currentUser?.accountType === 'prestataire' && (
-              <button
-                onClick={onQuickPublishClick}
-                className="mt-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer"
-              >
-                {language === 'ar' ? '+ نشر أول خدمة' : '+ Publier mon premier service'}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {cityServices.slice(0, 4).map((service) => (
-              <div 
-                key={service.serviceId}
-                onClick={() => onOpenService(service)}
-                className="bg-white border border-slate-200/70 rounded-2xl p-3 shadow-sm hover:border-[#2563EB] hover:shadow-md transition-all cursor-pointer flex gap-3 items-center"
-              >
-                <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 text-slate-500 font-bold text-sm">
-                  {service.images && service.images.length > 0 ? (
-                    <img src={service.images[0]} alt={service.title} className="w-full h-full object-cover rounded-xl" />
-                  ) : (
-                    <span>{service.category.slice(0, 2).toUpperCase()}</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-bold text-[#2563EB] uppercase block truncate">
-                    {getCategoryTranslation(service.category, language).name}
-                  </span>
-                  <h3 className="text-xs font-bold text-slate-900 truncate">{service.title}</h3>
-                  <p className="text-[11px] text-slate-500 truncate">{service.providerName}</p>
-
-                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-50">
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      {language === 'ar' ? `في ${getCityTranslation(service.city, 'ar')}` : `À ${service.city}`}
-                    </span>
-                    <span className="text-xs font-black text-[#0F2942]">
-                      {service.price} {language === 'ar' ? 'درهم' : 'MAD'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Real Firestore Urgent Client Requests */}
-      <div className="px-4 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xs font-bold text-slate-900 tracking-tight uppercase">
-              {language === 'ar' 
-                ? `طلبات الزبناء في ${getCityTranslation(selectedCity, 'ar')}` 
-                : `Demandes de particuliers à ${selectedCity}`}
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              {language === 'ar' ? 'مهام مفتوحة لعروض أسعار الحرفيين' : 'Missions ouvertes aux devis de prestataires'}
-            </p>
-          </div>
-          <button 
-            onClick={onQuickPublishClick}
-            className="text-[11px] bg-[#0F2942] text-white px-2.5 py-1 rounded-lg font-bold hover:bg-[#1E3A8A] cursor-pointer"
+          <button
+            type="button"
+            onClick={onNavigateSearch}
+            className="text-xs text-[#2563EB] dark:text-blue-400 font-bold hover:underline cursor-pointer shrink-0"
           >
-            {language === 'ar' ? '+ طلب خدمة' : '+ Demander'}
+            {isAr ? 'عرض الكل' : 'Tout voir'}
           </button>
         </div>
 
-        {cityRequests.length === 0 ? (
-          <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center space-y-2">
-            <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-            <h4 className="text-xs font-bold text-slate-700">
-              {language === 'ar' 
-                ? `لا توجد طلبات جارية حالياً في ${getCityTranslation(selectedCity, 'ar')}` 
-                : `Aucune demande en cours à ${selectedCity}`}
-            </h4>
-            <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-              {language === 'ar' 
-                ? 'هل تحتاج لإصلاح عاجل أو خدمة؟ انشر طلبك لاستقبال عروض الأسعار.' 
-                : 'Vous avez besoin d\'un dépannage ou d\'un service ? Publiez votre besoin pour recevoir des devis.'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {cityRequests.map((req) => (
-              <div 
-                key={req.requestId}
-                onClick={() => onOpenRequest(req)}
-                className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 hover:border-[#2563EB] transition-all cursor-pointer"
+        <div className="grid grid-cols-2 gap-3">
+          {SERVICE_CATEGORIES.map((cat) => {
+            const { Icon, gradient, ring, cardHover } = getCategoryVisual(cat.name);
+            const translated = getCategoryTranslation(cat.name, language);
+            return (
+              <button
+                key={cat.name}
+                type="button"
+                onClick={() => onSelectCategory(cat.name)}
+                className={`group flex flex-col items-start justify-between p-3.5 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 ${cardHover} rounded-2xl shadow-sm hover:shadow-md transition-all text-start cursor-pointer active:scale-[0.98]`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold text-[#2563EB] uppercase tracking-wider">
-                    {getCategoryTranslation(req.category, language).name}
-                  </span>
-                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {req.preferredDate}
-                  </span>
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 mb-1 leading-snug">{req.title}</h4>
-                <p className="text-[11px] text-slate-600 line-clamp-2 mb-2">{req.description}</p>
-                
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {req.clientAvatar ? (
-                      <img src={req.clientAvatar} alt={req.clientName} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0" />
-                    ) : null}
-                    <span className="text-[11px] font-semibold text-slate-700 truncate">{req.clientName}</span>
+                <div className="flex items-center justify-between w-full mb-2.5">
+                  <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} ring-4 ${ring} flex items-center justify-center shadow-md group-hover:scale-105 transition-transform`}>
+                    <Icon className="w-5 h-5 text-white stroke-[2.2]" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-emerald-700 text-xs">
-                      ~{req.budget} {language === 'ar' ? 'درهم' : 'MAD'}
-                    </span>
-                    <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-600 font-bold">
-                      {req.proposalsCount || 0} {language === 'ar' ? 'عرض' : 'offre(s)'}
-                    </span>
-                  </div>
+                  <ChevronRight className={`w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-[#2563EB] dark:group-hover:text-blue-400 transition-colors ${isAr ? 'rotate-180' : ''}`} />
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+                <div className="w-full">
+                  <h3 className="text-[13px] font-extrabold text-slate-900 dark:text-white leading-snug">
+                    {translated.name}
+                  </h3>
+                  <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                    {translated.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1874,6 +1896,9 @@ function HomeView({
    -------------------------------------------------------------------------- */
 function SearchView({
   services,
+  requests,
+  discoveryTab,
+  setDiscoveryTab,
   searchQuery,
   setSearchQuery,
   filterCategory,
@@ -1886,9 +1911,14 @@ function SearchView({
   setSortBy,
   selectedCity,
   language = 'fr',
-  onSelectService
+  onSelectService,
+  onSelectRequest,
+  onQuickPublishRequest
 }: {
   services: ServiceDoc[];
+  requests: ServiceRequestDoc[];
+  discoveryTab: 'services' | 'requests';
+  setDiscoveryTab: (tab: 'services' | 'requests') => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   filterCategory: string;
@@ -1902,12 +1932,42 @@ function SearchView({
   selectedCity: MoroccanCity;
   language?: 'fr' | 'ar';
   onSelectService: (s: ServiceDoc) => void;
+  onSelectRequest: (r: ServiceRequestDoc) => void;
+  onQuickPublishRequest: () => void;
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const isAr = language === 'ar';
 
   return (
     <div className="p-4 space-y-3.5" dir={isAr ? 'rtl' : 'ltr'}>
+      {/* Switcher: Services disponibles vs Demandes de particuliers */}
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => setDiscoveryTab('services')}
+          className={`min-h-[40px] px-2.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            discoveryTab === 'services'
+              ? 'bg-[#0F2942] dark:bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Briefcase className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">{isAr ? `الخدمات (${services.length})` : `Services (${services.length})`}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setDiscoveryTab('requests')}
+          className={`min-h-[40px] px-2.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            discoveryTab === 'requests'
+              ? 'bg-[#0F2942] dark:bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">{isAr ? `الطلبات (${requests.length})` : `Demandes (${requests.length})`}</span>
+        </button>
+      </div>
+
       {/* Search Bar */}
       <div className="relative">
         <Search className={`w-4 h-4 text-slate-400 absolute ${isAr ? 'right-3' : 'left-3'} top-3.5`} />
@@ -1915,13 +1975,19 @@ function SearchView({
           type="text" 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={isAr ? `البحث عن خدمة في ${getCityTranslation(selectedCity, 'ar')}...` : `Rechercher un service à ${selectedCity}...`}
-          className={`w-full bg-slate-50 border border-slate-200 rounded-xl ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white`}
+          placeholder={
+            discoveryTab === 'services'
+              ? (isAr ? `البحث عن خدمة في ${getCityTranslation(selectedCity, 'ar')}...` : `Rechercher un service à ${selectedCity}...`)
+              : (isAr ? `البحث عن طلب زبون في ${getCityTranslation(selectedCity, 'ar')}...` : `Rechercher une demande à ${selectedCity}...`)
+          }
+          className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white dark:focus:bg-slate-800`}
         />
         <button 
           onClick={() => setShowFilters(!showFilters)}
           className={`absolute ${isAr ? 'left-2' : 'right-2'} top-2 p-1.5 rounded-lg border cursor-pointer ${
-            showFilters ? 'bg-[#0F2942] text-white border-transparent' : 'bg-white text-slate-600 border-slate-200'
+            showFilters
+              ? 'bg-[#0F2942] dark:bg-blue-600 text-white border-transparent'
+              : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-slate-200 dark:border-slate-600'
           }`}
           aria-label={isAr ? "خيارات التصفية" : "Filtres"}
         >
@@ -1931,15 +1997,15 @@ function SearchView({
 
       {/* Filter options */}
       {showFilters && (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3 animate-fadeIn">
+        <div className="bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 space-y-3 animate-fadeIn">
           <div>
-            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200 block mb-1">
               {isAr ? 'القسم' : 'Catégorie'}
             </label>
             <select 
               value={filterCategory} 
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full text-xs bg-white border border-slate-200 rounded-lg p-2 focus:outline-none cursor-pointer"
+              className="w-full text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg p-2 focus:outline-none cursor-pointer"
             >
               <option value="all">{isAr ? 'جميع الأقسام' : 'Toutes les catégories'}</option>
               {SERVICE_CATEGORIES.map(c => (
@@ -1951,9 +2017,9 @@ function SearchView({
           </div>
 
           <div>
-            <div className="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+            <div className="flex justify-between text-[11px] font-bold text-slate-700 dark:text-slate-200 mb-1">
               <span>{isAr ? 'السعر الأقصى :' : 'Tarif maximum'}</span>
-              <span className="text-[#2563EB] font-black">{maxPrice} {isAr ? 'درهم' : 'MAD'}</span>
+              <span className="text-[#2563EB] dark:text-blue-400 font-black">{maxPrice} {isAr ? 'درهم' : 'MAD'}</span>
             </div>
             <input 
               type="range" 
@@ -1967,13 +2033,13 @@ function SearchView({
           </div>
 
           <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-semibold text-slate-700">
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
               {isAr ? 'ترتيب حسب :' : 'Trier par :'}
             </span>
             <select 
               value={sortBy} 
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="text-xs bg-white border border-slate-200 rounded-lg p-1.5 font-bold cursor-pointer"
+              className="text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 font-bold cursor-pointer"
             >
               <option value="relevant">{isAr ? 'الأكثر ملائمة' : 'Pertinence'}</option>
               <option value="priceAsc">{isAr ? 'السعر: من الأقل للأعلى' : 'Prix croissant'}</option>
@@ -1984,63 +2050,135 @@ function SearchView({
       )}
 
       {/* Result list */}
-      <div className="space-y-3">
-        {services.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 p-6 space-y-2">
-            <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-800">
-              {isAr ? `لم يتم العثور على خدمات في ${getCityTranslation(selectedCity, 'ar')}` : `Aucun résultat trouvé à ${selectedCity}`}
-            </h4>
-            <p className="text-xs text-slate-500">
-              {isAr ? 'لا توجد خدمات تطابق بحثك حالياً في قاعدة البيانات.' : 'Aucun service ne correspond à votre recherche dans la base de données.'}
-            </p>
-          </div>
-        ) : (
-          services.map(srv => {
-            let translatedPricingType: string = srv.pricingType;
-            if (isAr) {
-              if (srv.pricingType === 'Fixe') translatedPricingType = 'سعر محدد';
-              if (srv.pricingType === 'Par heure') translatedPricingType = 'بالساعة';
-              if (srv.pricingType === 'Négociable') translatedPricingType = 'قابل للتفاوض';
-            }
+      {discoveryTab === 'services' ? (
+        <div className="space-y-3">
+          {services.length === 0 ? (
+            <div className="text-center py-12 bg-white dark:bg-slate-800/70 rounded-2xl border border-slate-100 dark:border-slate-700 p-6 space-y-2">
+              <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {isAr ? `لم يتم العثور على خدمات في ${getCityTranslation(selectedCity, 'ar')}` : `Aucun résultat trouvé à ${selectedCity}`}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {isAr ? 'لا توجد خدمات تطابق بحثك حالياً في قاعدة البيانات.' : 'Aucun service ne correspond à votre recherche dans la base de données.'}
+              </p>
+            </div>
+          ) : (
+            services.map(srv => {
+              let translatedPricingType: string = srv.pricingType;
+              if (isAr) {
+                if (srv.pricingType === 'Fixe') translatedPricingType = 'سعر محدد';
+                if (srv.pricingType === 'Par heure') translatedPricingType = 'بالساعة';
+                if (srv.pricingType === 'Négociable') translatedPricingType = 'قابل للتفاوض';
+              }
+              const { Icon, gradient } = getCategoryVisual(srv.category);
 
-            return (
-              <div 
-                key={srv.serviceId}
-                onClick={() => onSelectService(srv)}
-                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:border-[#2563EB] transition-all cursor-pointer flex gap-3.5"
-              >
-                <div className="w-20 h-20 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200 font-bold text-sm text-slate-600">
-                  {srv.category.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-slate-400">
-                        {getCityTranslation(srv.city, language)}
+              return (
+                <div 
+                  key={srv.serviceId}
+                  onClick={() => onSelectService(srv)}
+                  className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-2xl p-3.5 shadow-sm hover:border-[#2563EB] dark:hover:border-blue-500 transition-all cursor-pointer flex gap-3.5"
+                >
+                  <div className="w-20 h-20 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-600 overflow-hidden">
+                    {srv.images && srv.images.length > 0 ? (
+                      <img src={srv.images[0]} alt={srv.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-sm`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold text-[#2563EB] dark:text-blue-400">
+                          {getCategoryTranslation(srv.category, language).name} • {getCityTranslation(srv.city, language)}
+                        </span>
+                        <span className="text-xs font-black text-[#0F2942] dark:text-emerald-400">
+                          {srv.price} {isAr ? 'درهم' : 'MAD'}
+                        </span>
+                      </div>
+                      <h3 className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">{srv.title}</h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">{srv.providerName}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700 text-[11px]">
+                      <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
+                        {translatedPricingType}
                       </span>
-                      <span className="text-xs font-black text-[#0F2942]">
-                        {srv.price} {isAr ? 'درهم' : 'MAD'}
+                      <span className="text-[10px] text-[#2563EB] dark:text-blue-400 font-bold">
+                        {isAr ? 'عرض التفاصيل' : 'Consulter'}
                       </span>
                     </div>
-                    <h3 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2">{srv.title}</h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">{srv.providerName}</p>
                   </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              {isAr ? 'مهام مفتوحة لعروض أسعار الحرفيين' : 'Missions ouvertes aux devis de prestataires'}
+            </span>
+            <button
+              type="button"
+              onClick={onQuickPublishRequest}
+              className="text-[11px] bg-[#0F2942] dark:bg-blue-600 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-bold cursor-pointer shrink-0"
+            >
+              {isAr ? '+ طلب خدمة' : '+ Demander'}
+            </button>
+          </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                    <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md">
-                      {translatedPricingType}
+          {requests.length === 0 ? (
+            <div className="text-center py-12 bg-white dark:bg-slate-800/70 rounded-2xl border border-slate-100 dark:border-slate-700 p-6 space-y-2">
+              <FileText className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {isAr ? `لا توجد طلبات جارية حالياً في ${getCityTranslation(selectedCity, 'ar')}` : `Aucune demande en cours à ${selectedCity}`}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {isAr ? 'انشر حاجتك لاستقبال عروض الأسعار.' : 'Publiez votre besoin pour recevoir des devis.'}
+              </p>
+            </div>
+          ) : (
+            requests.map(req => (
+              <div 
+                key={req.requestId}
+                onClick={() => onSelectRequest(req)}
+                className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-2xl p-3.5 shadow-sm hover:border-[#2563EB] dark:hover:border-blue-500 transition-all cursor-pointer"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-[#2563EB] dark:text-blue-400 uppercase tracking-wider">
+                    {getCategoryTranslation(req.category, language).name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {req.preferredDate}
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-1 leading-snug">{req.title}</h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mb-2">{req.description}</p>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700 text-xs">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {req.clientAvatar ? (
+                      <img src={req.clientAvatar} alt={req.clientName} className="w-5 h-5 rounded-full object-cover border border-slate-200 dark:border-slate-600 shrink-0" />
+                    ) : null}
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">{req.clientName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-black text-emerald-700 dark:text-emerald-400 text-xs">
+                      ~{req.budget} {isAr ? 'درهم' : 'MAD'}
                     </span>
-                    <span className="text-[10px] text-[#2563EB] font-bold">
-                      {isAr ? 'عرض التفاصيل' : 'Consulter'}
+                    <span className="text-[10px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-200 font-bold">
+                      {req.proposalsCount || 0} {isAr ? 'عرض' : 'offre(s)'}
                     </span>
                   </div>
                 </div>
               </div>
-            );
-          })
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2062,10 +2200,10 @@ function PublishHubView({
   return (
     <div className="p-4 space-y-4">
       <div className="text-center py-3">
-        <h2 className="text-lg font-black text-[#0F2942]">
+        <h2 className="text-lg font-black text-[#0F2942] dark:text-white">
           {isAr ? 'ما الذي ترغب في نشره؟' : 'Que souhaitez-vous publier ?'}
         </h2>
-        <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
           {isAr 
             ? 'يتم حفظ جميع الإعلانات والطلبات بشكل دائم في قاعدة البيانات.' 
             : 'Toutes les publications sont enregistrées de façon permanente dans la base Cloud Firestore.'}
@@ -2074,7 +2212,7 @@ function PublishHubView({
 
       <div 
         onClick={() => onOpenPublishModal('request')}
-        className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-3xl p-5 cursor-pointer hover:border-[#2563EB] transition-all group shadow-sm"
+        className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/60 dark:to-indigo-950/60 border-2 border-blue-200 dark:border-blue-800/70 rounded-3xl p-5 cursor-pointer hover:border-[#2563EB] dark:hover:border-blue-500 transition-all group shadow-sm"
       >
         <div className="w-12 h-12 bg-[#2563EB] text-white rounded-2xl flex items-center justify-center mb-3 shadow-md group-hover:scale-105 transition-transform">
           <Briefcase className="w-6 h-6" />
@@ -2082,10 +2220,10 @@ function PublishHubView({
         <span className="text-[10px] bg-[#2563EB] text-white font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
           {isAr ? 'للزبناء والأفراد' : 'Pour les Particuliers'}
         </span>
-        <h3 className="text-sm font-bold text-slate-900 mt-2">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-2">
           {isAr ? 'نشر طلب خدمة أو عمالة' : 'Publier une demande de service'}
         </h3>
-        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
           {isAr
             ? 'صف حاجتك بدقة (سباكة، كهرباء، تنظيف، دروس خاصة، صباغة...) واستقبل عروضاً مباشرة من محترفين موثوقين.'
             : 'Décrivez votre besoin (plomberie, électricité, ménage, cours) et recevez des propositions de prestataires qualifiés.'}
@@ -2094,7 +2232,7 @@ function PublishHubView({
 
       <div 
         onClick={() => onOpenPublishModal('service')}
-        className="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-3xl p-5 cursor-pointer hover:border-emerald-500 transition-all group shadow-sm"
+        className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 border-2 border-emerald-200 dark:border-emerald-800/70 rounded-3xl p-5 cursor-pointer hover:border-emerald-500 transition-all group shadow-sm"
       >
         <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mb-3 shadow-md group-hover:scale-105 transition-transform">
           <GraduationCap className="w-6 h-6" />
@@ -2102,10 +2240,10 @@ function PublishHubView({
         <span className="text-[10px] bg-emerald-700 text-white font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
           {isAr ? 'للمهنيين والحرفيين والطلبة' : 'Pour les Prestataires & Étudiants'}
         </span>
-        <h3 className="text-sm font-bold text-slate-900 mt-2">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-2">
           {isAr ? 'عرض مهاراتي أو خدماتي' : 'Proposer mes compétences ou services'}
         </h3>
-        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
           {isAr
             ? 'انشر عروضك بالدرهم المغربي، حدد مناطق تدخلك واكسب زبناء جدد في فاس، مكناس وباقي المدن.'
             : 'Publiez vos offres en MAD, définissez vos zones d’intervention et trouvez de nouveaux clients à Fès, Meknès et environs.'}
@@ -2140,18 +2278,18 @@ function MessagesListView({
   if (!currentUser) {
     return (
       <div className="p-8 text-center space-y-3">
-        <MessageSquare className="w-12 h-12 text-slate-300 mx-auto" />
-        <h3 className="text-sm font-bold text-slate-800">
+        <MessageSquare className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
+        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
           {isAr ? 'الرسائل الخاصة' : 'Messagerie Privée'}
         </h3>
-        <p className="text-xs text-slate-500 max-w-xs mx-auto">
+        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
           {isAr 
             ? 'سجّل دخولك للتواصل مباشرة وسرياً مع الزبناء أو الحرفيين والمهنيين على Wasta No.'
             : 'Connectez-vous pour échanger directement avec des clients ou des prestataires sur Wasta No.'}
         </p>
         <button
           onClick={onOpenLogin}
-          className="py-2.5 px-5 bg-[#0F2942] text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-[#1E3A8A]"
+          className="py-2.5 px-5 bg-[#0F2942] dark:bg-blue-600 text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-[#1E3A8A] dark:hover:bg-blue-700"
         >
           {isAr ? 'تسجيل الدخول' : 'Se connecter'}
         </button>
@@ -2162,20 +2300,20 @@ function MessagesListView({
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-black text-[#0F2942]">
+        <h2 className="text-base font-black text-[#0F2942] dark:text-white">
           {isAr ? 'المحادثات المباشرة' : 'Messagerie directe'}
         </h2>
-        <span className="text-xs text-slate-500 font-bold">
+        <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">
           {isAr ? `${conversations.length} محادثة` : `${conversations.length} conversation(s)`}
         </span>
       </div>
 
       {/* Browser / Phone Notification opt-in banner */}
       {notifPermission === 'default' && onRequestNotifPermission && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 flex items-center justify-between gap-2">
+        <div className="bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 rounded-2xl p-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <BellRing className="w-4 h-4 text-[#2563EB] shrink-0" />
-            <p className="text-[11px] text-slate-700 font-semibold leading-snug">
+            <BellRing className="w-4 h-4 text-[#2563EB] dark:text-blue-400 shrink-0" />
+            <p className="text-[11px] text-slate-700 dark:text-slate-200 font-semibold leading-snug">
               {isAr
                 ? 'فعّل التنبيهات لتتوصل بإشعار فوري عند استلام أي رسالة جديدة.'
                 : 'Activez les alertes pour être prévenu dès qu’une personne vous envoie un message.'}
@@ -2192,12 +2330,12 @@ function MessagesListView({
       )}
 
       {conversations.length === 0 ? (
-        <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6">
-          <MessageSquare className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <h4 className="text-sm font-bold text-slate-700">
+        <div className="text-center py-16 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6">
+          <MessageSquare className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">
             {isAr ? 'لا توجد محادثات بعد' : 'Aucune conversation'}
           </h4>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {isAr 
               ? 'ستظهر هنا جميع رسائلك المتبادلة مع الزبناء أو مقدمي الخدمات.' 
               : 'Les échanges avec vos clients ou prestataires apparaîtront ici.'}
@@ -2215,19 +2353,19 @@ function MessagesListView({
               onClick={() => onSelectChat(conv)}
               className={`border rounded-2xl p-3.5 shadow-sm flex items-center gap-3 cursor-pointer transition-all ${
                 unreadCount > 0
-                  ? 'bg-blue-50/60 border-[#2563EB] hover:bg-blue-50'
-                  : 'bg-white border-slate-100 hover:border-blue-300'
+                  ? 'bg-blue-50/60 dark:bg-blue-950/40 border-[#2563EB] dark:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/60'
+                  : 'bg-white dark:bg-slate-800/90 border-slate-100 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500'
               }`}
             >
-              <div className="relative w-11 h-11 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm text-[#0F2942] shrink-0">
+              <div className="relative w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center font-bold text-sm text-[#0F2942] dark:text-slate-100 shrink-0">
                 {otherName.charAt(0)}
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 border-2 border-white" />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 border-2 border-white dark:border-slate-800" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5 gap-2">
-                  <h4 className={`text-xs truncate ${unreadCount > 0 ? 'font-black text-[#0F2942]' : 'font-bold text-slate-900'}`}>
+                  <h4 className={`text-xs truncate ${unreadCount > 0 ? 'font-black text-[#0F2942] dark:text-white' : 'font-bold text-slate-900 dark:text-slate-100'}`}>
                     {otherName}
                   </h4>
                   {unreadCount > 0 && (
@@ -2236,11 +2374,11 @@ function MessagesListView({
                     </span>
                   )}
                 </div>
-                <p className={`text-xs truncate ${unreadCount > 0 ? 'font-bold text-slate-800' : 'text-slate-500'}`}>
+                <p className={`text-xs truncate ${unreadCount > 0 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}>
                   {conv.lastMessage || (isAr ? 'محادثة جديدة' : 'Nouvelle conversation')}
                 </p>
               </div>
-              <ChevronRight className={`w-4 h-4 text-slate-300 shrink-0 ${isAr ? 'rotate-180' : ''}`} />
+              <ChevronRight className={`w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0 ${isAr ? 'rotate-180' : ''}`} />
             </div>
           );
         })
@@ -2264,7 +2402,9 @@ function UserProfileHubView({
   onUpdateProfilePhoto,
   onLogout,
   language,
-  setLanguage
+  setLanguage,
+  theme,
+  setTheme
 }: {
   currentUser: UserDoc | null;
   providerProfile: ProviderProfileDoc | null;
@@ -2278,6 +2418,8 @@ function UserProfileHubView({
   onLogout: () => void;
   language: 'fr' | 'ar';
   setLanguage: (l: 'fr' | 'ar') => void;
+  theme: 'light' | 'dark';
+  setTheme: (t: 'light' | 'dark') => void;
 }) {
   const isAr = language === 'ar';
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -2295,14 +2437,53 @@ function UserProfileHubView({
     }
   };
 
+  const themeToggleRow = (
+    <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+      <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+        {theme === 'dark' ? (
+          <Moon className="w-4 h-4 text-amber-400" />
+        ) : (
+          <Sun className="w-4 h-4 text-amber-500" />
+        )}
+        <span>{isAr ? 'مظهر التطبيق' : 'Thème d’affichage'}</span>
+      </span>
+      <div className="flex bg-white dark:bg-slate-900 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+        <button
+          type="button"
+          onClick={() => setTheme('light')}
+          className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+            theme === 'light'
+              ? 'bg-[#0F2942] text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Sun className="w-3 h-3" />
+          <span>{isAr ? 'فاتح' : 'Clair'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTheme('dark')}
+          className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+            theme === 'dark'
+              ? 'bg-[#2563EB] text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Moon className="w-3 h-3" />
+          <span>{isAr ? 'داكن' : 'Sombre'}</span>
+        </button>
+      </div>
+    </div>
+  );
+
   if (!currentUser) {
     return (
-      <div className="p-6 text-center space-y-4 my-8">
-        <User className="w-16 h-16 text-slate-300 mx-auto" />
-        <h2 className="text-base font-black text-[#0F2942]">
+      <div className="p-6 text-center space-y-4 my-6">
+        <User className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto" />
+        <h2 className="text-base font-black text-[#0F2942] dark:text-white">
           {isAr ? 'فضاء Wasta No الخاص بي' : 'Mon Espace Wasta No'}
         </h2>
-        <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
+        <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mx-auto leading-relaxed">
           {isAr
             ? 'سجّل دخولك أو أنشئ حسابك في ثوانٍ لإدارة خدماتك، طلباتك ومحادثاتك مع الزبناء.'
             : 'Connectez-vous ou créez votre compte en quelques secondes pour gérer vos services, demandes et messages.'}
@@ -2310,16 +2491,20 @@ function UserProfileHubView({
         <div className="flex flex-col gap-2 max-w-xs mx-auto">
           <button
             onClick={() => onOpenAuthModal('login')}
-            className="w-full py-2.5 bg-[#0F2942] hover:bg-[#1E3A8A] text-white text-xs font-bold rounded-xl cursor-pointer"
+            className="w-full py-2.5 bg-[#0F2942] dark:bg-blue-600 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer"
           >
             {isAr ? 'تسجيل الدخول' : 'Se connecter'}
           </button>
           <button
             onClick={() => onOpenAuthModal('signup')}
-            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+            className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl cursor-pointer"
           >
             {isAr ? 'إنشاء حساب جديد' : 'Créer un compte'}
           </button>
+        </div>
+
+        <div className="max-w-xs mx-auto pt-2 text-start">
+          {themeToggleRow}
         </div>
       </div>
     );
@@ -2330,7 +2515,7 @@ function UserProfileHubView({
   return (
     <div className="p-4 space-y-4 pb-8 animate-fadeIn">
       {/* Profile Header */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm text-center relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-3xl p-5 shadow-sm text-center relative overflow-hidden">
         <input
           ref={photoInputRef}
           type="file"
@@ -2339,7 +2524,7 @@ function UserProfileHubView({
           className="hidden"
         />
         <div className="relative w-20 h-20 mx-auto mb-2.5">
-          <div className="w-20 h-20 rounded-full bg-slate-100 border-4 border-slate-50 shadow flex items-center justify-center font-black text-2xl text-[#0F2942] overflow-hidden">
+          <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 border-4 border-slate-50 dark:border-slate-800 shadow flex items-center justify-center font-black text-2xl text-[#0F2942] dark:text-white overflow-hidden">
             {uploadingPhoto ? (
               <Loader2 className="w-6 h-6 text-[#2563EB] animate-spin" />
             ) : currentUser.profileImage ? (
@@ -2356,20 +2541,22 @@ function UserProfileHubView({
             type="button"
             onClick={() => photoInputRef.current?.click()}
             disabled={uploadingPhoto}
-            className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#2563EB] hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white cursor-pointer"
+            className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#2563EB] hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white dark:border-slate-800 cursor-pointer"
             title={isAr ? 'تغيير الصورة الشخصية' : 'Modifier la photo de profil'}
             aria-label={isAr ? 'تغيير الصورة الشخصية' : 'Modifier la photo de profil'}
           >
             <Camera className="w-3.5 h-3.5" />
           </button>
         </div>
-        <h2 className="text-base font-extrabold text-[#0F2942]">{currentUser.fullName}</h2>
-        <p className="text-xs text-slate-500">
+        <h2 className="text-base font-extrabold text-[#0F2942] dark:text-white">{currentUser.fullName}</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {currentUser.email} • {getCityTranslation(currentUser.city, language)}, {isAr ? 'المغرب' : 'Maroc'}
         </p>
 
         <span className={`inline-block mt-2 px-3 py-0.5 rounded-full text-[10px] font-bold ${
-          isPrestataire ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+          isPrestataire
+            ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300'
+            : 'bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300'
         }`}>
           {isPrestataire 
             ? (isAr ? 'حساب مقدم خدمات / حرفي' : 'Compte Prestataire de Services') 
@@ -2380,9 +2567,9 @@ function UserProfileHubView({
           <div className="mt-3">
             <button
               onClick={onOpenProfileEditor}
-              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-100 text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <Edit3 className="w-3.5 h-3.5 text-[#2563EB]" />
+              <Edit3 className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
               <span>{isAr ? 'تعديل ملفي المهني' : 'Modifier mon profil professionnel'}</span>
             </button>
           </div>
@@ -2393,23 +2580,23 @@ function UserProfileHubView({
       {isPrestataire && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
               {isAr ? 'خدماتي المنشورة' : 'Mes Services en ligne'}
             </h3>
-            <span className="text-[11px] font-bold text-[#2563EB]">
+            <span className="text-[11px] font-bold text-[#2563EB] dark:text-blue-400">
               {isAr ? `${myServices.length} نشطة` : `${myServices.length} actif(s)`}
             </span>
           </div>
 
           {myServices.length === 0 ? (
-            <p className="text-xs text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-400 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/70 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
               {isAr ? 'لم تقم بنشر أي خدمة بعد.' : "Vous n'avez pas encore publié de service."}
             </p>
           ) : (
             myServices.map(s => (
-              <div key={s.serviceId} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-center text-xs shadow-sm">
-                <span className="font-semibold text-slate-800 truncate mr-2">{s.title}</span>
-                <span className="font-bold text-[#0F2942] shrink-0">{s.price} {isAr ? 'درهم' : 'MAD'}</span>
+              <div key={s.serviceId} className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex justify-between items-center text-xs shadow-sm">
+                <span className="font-semibold text-slate-800 dark:text-slate-100 truncate mr-2">{s.title}</span>
+                <span className="font-bold text-[#0F2942] dark:text-emerald-400 shrink-0">{s.price} {isAr ? 'درهم' : 'MAD'}</span>
               </div>
             ))
           )}
@@ -2420,26 +2607,26 @@ function UserProfileHubView({
       {!isPrestataire && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
               {isAr ? 'طلباتي المنشورة' : 'Mes Demandes Publiées'}
             </h3>
-            <span className="text-[11px] font-bold text-[#2563EB]">{myRequests.length}</span>
+            <span className="text-[11px] font-bold text-[#2563EB] dark:text-blue-400">{myRequests.length}</span>
           </div>
 
           {myRequests.length === 0 ? (
-            <p className="text-xs text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-400 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/70 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
               {isAr ? 'لا توجد طلبات مسجلة بعد.' : 'Aucune demande enregistrée.'}
             </p>
           ) : (
             myRequests.map(r => (
-              <div key={r.requestId} className="bg-white border border-slate-200 rounded-xl p-3 text-xs shadow-sm space-y-1">
-                <div className="flex justify-between font-bold text-slate-800">
+              <div key={r.requestId} className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs shadow-sm space-y-1">
+                <div className="flex justify-between font-bold text-slate-800 dark:text-slate-100">
                   <span className="truncate mr-2">{r.title}</span>
-                  <span className="text-emerald-700 capitalize">
+                  <span className="text-emerald-700 dark:text-emerald-400 capitalize">
                     {isAr ? (r.status === 'open' ? 'مفتوح' : 'مكتمل') : r.status}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {isAr ? `تم استلام ${r.proposalsCount || 0} عروض` : `Reçu ${r.proposalsCount || 0} devis`}
                 </p>
               </div>
@@ -2449,30 +2636,37 @@ function UserProfileHubView({
       )}
 
       {/* Account actions & preferences */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-          {isAr ? 'الإعدادات واللغة' : 'Paramètres'}
+      <div className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
+        <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+          {isAr ? 'الإعدادات والمظهر واللغة' : 'Paramètres'}
         </h3>
 
+        {/* Light / Dark Theme Toggle */}
+        {themeToggleRow}
+
         {/* In-profile language switch */}
-        <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-          <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
-            <Globe className="w-4 h-4 text-[#2563EB]" />
+        <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
             <span>{isAr ? 'لغة التطبيق' : "Langue de l'application"}</span>
           </span>
-          <div className="flex bg-white rounded-lg p-0.5 border border-slate-200 text-xs font-bold">
+          <div className="flex bg-white dark:bg-slate-900 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-xs font-bold">
             <button
               onClick={() => setLanguage('fr')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                language === 'fr' ? 'bg-[#0F2942] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                language === 'fr'
+                  ? 'bg-[#0F2942] text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Français
             </button>
             <button
               onClick={() => setLanguage('ar')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                language === 'ar' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                language === 'ar'
+                  ? 'bg-[#2563EB] text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               العربية
@@ -2483,10 +2677,10 @@ function UserProfileHubView({
         {currentUser.role === 'admin' || currentUser.email === 'dkhissiabdelamine@gmail.com' ? (
           <button
             onClick={onOpenAdmin}
-            className="w-full text-left py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-bold flex items-center justify-between cursor-pointer"
+            className="w-full text-left py-2.5 px-3 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/70 text-purple-900 dark:text-purple-200 border border-transparent dark:border-purple-800/50 text-xs font-bold flex items-center justify-between cursor-pointer"
           >
             <span className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-purple-600" />
+              <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               <span>{isAr ? 'لوحة تحكم الإدارة (Firestore)' : 'Ouvrir la Console Administration'}</span>
             </span>
             <ChevronRight className={`w-4 h-4 text-purple-400 ${isAr ? 'rotate-180' : ''}`} />
@@ -2495,10 +2689,10 @@ function UserProfileHubView({
 
         <button
           onClick={onLogout}
-          className="w-full text-left py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold flex items-center justify-between cursor-pointer"
+          className="w-full text-left py-2.5 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/70 text-rose-800 dark:text-rose-300 border border-transparent dark:border-rose-800/50 text-xs font-bold flex items-center justify-between cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <LogOut className="w-4 h-4 text-rose-600" />
+            <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400" />
             <span>{isAr ? 'تسجيل الخروج من Wasta No' : 'Se déconnecter de Wasta No'}</span>
           </span>
           <ChevronRight className={`w-4 h-4 text-rose-400 ${isAr ? 'rotate-180' : ''}`} />
@@ -2532,12 +2726,12 @@ function LikeButton({
       }}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
         isLiked 
-          ? 'bg-rose-50 border-rose-200 text-rose-600 shadow-xs' 
-          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-700 text-rose-600 dark:text-rose-400 shadow-xs' 
+          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
       }`}
       title={isLiked ? (isAr ? 'إلغاء الإعجاب' : 'Je n’aime plus') : (isAr ? 'إعجاب' : 'J’aime')}
     >
-      <Heart className={`w-4 h-4 ${isLiked ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-400'} transition-transform`} />
+      <Heart className={`w-4 h-4 ${isLiked ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-400 dark:text-slate-500'} transition-transform`} />
       <span>{likesCount}</span>
     </button>
   );
@@ -2570,14 +2764,14 @@ function CommentsSection({
   const isLiked = currentUser ? likedBy.includes(currentUser.uid) : false;
 
   return (
-    <div className="space-y-3 pt-3 border-t border-slate-200">
+    <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-700">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-          <MessageSquare className="w-3.5 h-3.5 text-[#2563EB]" />
+        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+          <MessageSquare className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
           <span>{isAr ? `التعليقات والآراء (${filteredComments.length})` : `Commentaires & Avis (${filteredComments.length})`}</span>
         </h4>
         {likesCount !== undefined && (
-          <span className="text-[11px] font-bold text-slate-500">
+          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
             {likesCount} {isAr ? 'إعجاب' : 'J’aime'}
           </span>
         )}
@@ -2585,22 +2779,22 @@ function CommentsSection({
 
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {filteredComments.length === 0 ? (
-          <p className="text-xs text-slate-400 italic py-1">
+          <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1">
             {isAr ? 'كن أول من يكتب تعليقاً أو رأياً حول هذا المنشور.' : 'Soyez le premier à commenter cette publication.'}
           </p>
         ) : (
           filteredComments.map(c => (
-            <div key={c.commentId} className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-xs space-y-1">
+            <div key={c.commentId} className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 rounded-xl p-2.5 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 text-[#0F2942] font-black flex items-center justify-center text-[10px] overflow-hidden">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-950 text-[#0F2942] dark:text-blue-300 font-black flex items-center justify-center text-[10px] overflow-hidden">
                     {c.userAvatar ? <img src={c.userAvatar} alt={c.userName} className="w-full h-full object-cover" /> : c.userName.charAt(0)}
                   </div>
-                  <span className="font-bold text-slate-900">{c.userName}</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{c.userName}</span>
                 </div>
-                <span className="text-[9px] text-slate-400">{c.createdAt}</span>
+                <span className="text-[9px] text-slate-400 dark:text-slate-500">{c.createdAt}</span>
               </div>
-              <p className="text-slate-700 leading-snug pl-8">{c.content}</p>
+              <p className="text-slate-700 dark:text-slate-300 leading-snug pl-8">{c.content}</p>
             </div>
           ))
         )}
@@ -2622,12 +2816,12 @@ function CommentsSection({
             value={newCommentText}
             onChange={e => setNewCommentText(e.target.value)}
             placeholder={isAr ? 'اكتب تعليقاً أو رأيك...' : 'Écrire un commentaire ou avis...'}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-9 py-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB] transition-all"
+            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-3 pr-9 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[#2563EB] transition-all"
           />
           <button
             type="submit"
             disabled={!newCommentText.trim()}
-            className="absolute right-1.5 p-1.5 bg-[#0F2942] hover:bg-[#1E3A8A] disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed shadow-xs"
+            className="absolute right-1.5 p-1.5 bg-[#0F2942] dark:bg-blue-600 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 text-white disabled:text-slate-400 dark:disabled:text-slate-500 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed shadow-xs"
             title={isAr ? 'نشر التعليق' : 'Publier'}
           >
             <Send className="w-3.5 h-3.5" />
@@ -2640,8 +2834,8 @@ function CommentsSection({
             onClick={onToggleLike}
             className={`px-3 py-2.5 rounded-xl border flex items-center gap-1.5 transition-all duration-200 cursor-pointer shrink-0 shadow-xs active:scale-95 select-none ${
               isLiked
-                ? 'bg-red-50 border-red-300 text-red-600 shadow-sm'
-                : 'bg-white border-slate-300 text-slate-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50/50'
+                ? 'bg-red-50 dark:bg-red-950/60 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 shadow-sm'
+                : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:border-red-200 hover:bg-red-50/50 dark:hover:bg-red-950/40'
             }`}
             title={isLiked ? (isAr ? 'إلغاء الإعجاب' : 'Je n’aime plus') : (isAr ? 'أعجبني هذا المنشور' : 'J’aime')}
           >
@@ -2649,10 +2843,10 @@ function CommentsSection({
               className={`w-5 h-5 transition-transform duration-200 ${
                 isLiked
                   ? 'fill-red-600 text-red-600 scale-110 drop-shadow-[0_1px_3px_rgba(220,38,38,0.4)] animate-pulse'
-                  : 'text-slate-400 hover:text-red-500'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-red-500'
               }`}
             />
-            <span className={`text-xs font-black ${isLiked ? 'text-red-600' : 'text-slate-700'}`}>
+            <span className={`text-xs font-black ${isLiked ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
               {likesCount ?? 0}
             </span>
           </button>
@@ -2685,33 +2879,33 @@ function ServiceDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
-        <div className="flex justify-between items-center border-b pb-3">
-          <h3 className="text-sm font-bold text-slate-800">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl border border-transparent dark:border-slate-800">
+        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
             {isAr ? 'تفاصيل الخدمة المنشورة' : 'Détail du service'}
           </h3>
           <button onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Fermer'} className="cursor-pointer">
-            <XCircle className="w-5 h-5 text-slate-400" />
+            <XCircle className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" />
           </button>
         </div>
 
         {service.images && service.images.length > 0 && (
-          <div className="rounded-2xl overflow-hidden h-48 border border-slate-200 shadow-inner">
+          <div className="rounded-2xl overflow-hidden h-48 border border-slate-200 dark:border-slate-700 shadow-inner">
             <img src={service.images[0]} alt={service.title} className="w-full h-full object-cover" />
           </div>
         )}
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold text-[#2563EB] uppercase">
+            <span className="text-[10px] font-bold text-[#2563EB] dark:text-blue-400 uppercase">
               {getCategoryTranslation(service.category, language).name} • {getCityTranslation(service.city, language)}
             </span>
-            <span className="text-sm font-black text-[#0F2942]">
+            <span className="text-sm font-black text-[#0F2942] dark:text-emerald-400">
               {service.price} {isAr ? 'درهم' : 'MAD'}
             </span>
           </div>
-          <h2 className="text-base font-extrabold text-[#0F2942]">{service.title}</h2>
-          <p className="text-xs text-slate-600 mt-2 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">
+          <h2 className="text-base font-extrabold text-[#0F2942] dark:text-white">{service.title}</h2>
+          <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700 leading-relaxed">
             {service.description}
           </p>
         </div>
@@ -2720,7 +2914,7 @@ function ServiceDetailModal({
           <button
             type="button"
             onClick={() => onOpenProvider(service)}
-            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer text-center"
+            className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl cursor-pointer text-center"
           >
             {isAr ? `عرض الملف التعريفي لـ ${service.providerName}` : `Voir le profil de ${service.providerName}`}
           </button>
@@ -2791,18 +2985,18 @@ function ProviderProfileModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
-        <div className="flex justify-between items-center border-b pb-3">
-          <h3 className="text-sm font-bold text-slate-800">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl border border-transparent dark:border-slate-800">
+        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
             {isAr ? 'الملف التعريفي للمهني' : 'Profil du prestataire'}
           </h3>
           <button onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Fermer'} className="cursor-pointer">
-            <XCircle className="w-5 h-5 text-slate-400" />
+            <XCircle className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" />
           </button>
         </div>
 
         <div className="flex gap-3.5 items-center">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-lg text-[#0F2942] overflow-hidden shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-lg text-[#0F2942] dark:text-white overflow-hidden shrink-0">
             {provider.profileImage ? (
               <img src={provider.profileImage} alt={provider.fullName} className="w-full h-full object-cover" />
             ) : (
@@ -2811,33 +3005,33 @@ function ProviderProfileModal({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h2 className="text-base font-extrabold text-[#0F2942]">{provider.fullName}</h2>
-              {provider.isVerified && <ShieldCheck className="w-4 h-4 text-emerald-600" />}
+              <h2 className="text-base font-extrabold text-[#0F2942] dark:text-white">{provider.fullName}</h2>
+              {provider.isVerified && <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
             </div>
-            <p className="text-xs text-slate-500">{provider.professionalTitle || (isAr ? 'مهني / حرفي' : 'Prestataire')}</p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-300">{provider.professionalTitle || (isAr ? 'مهني / حرفي' : 'Prestataire')}</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400">
               {getCityTranslation(provider.city as any, language)}, {isAr ? 'المغرب' : 'Maroc'}
             </p>
           </div>
         </div>
 
         <div className="space-y-1">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
             {isAr ? 'نبذة تعريفية' : 'Présentation'}
           </h4>
-          <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
             {provider.description || (isAr ? 'لا يوجد وصف محدد حالياً.' : 'Aucune description rédigée.')}
           </p>
         </div>
 
         {/* Section Commentaires & Cœur tactile J'aime */}
-        <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-3.5 space-y-3">
+        <div className="bg-slate-50/90 dark:bg-slate-800/70 border border-slate-200/90 dark:border-slate-700 rounded-2xl p-3.5 space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 text-[#2563EB]" />
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
               <span>{isAr ? `التعليقات والآراء (${filteredComments.length})` : `Commentaires & Avis (${filteredComments.length})`}</span>
             </h4>
-            <span className="text-[11px] font-bold text-slate-500">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
               {effectiveLikesCount} {isAr ? 'إعجاب' : 'J’aime'}
             </span>
           </div>
@@ -2845,26 +3039,26 @@ function ProviderProfileModal({
           {/* Liste des commentaires existants */}
           <div className="space-y-2 max-h-40 overflow-y-auto pr-0.5">
             {filteredComments.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-1 bg-white p-2.5 rounded-xl border border-dashed border-slate-200 text-center">
+              <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1 bg-white dark:bg-slate-900/70 p-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
                 {isAr ? 'لا توجد تعليقات بعد. كن أول من يكتب تعليقاً !' : 'Aucun commentaire pour l’instant. Soyez le premier à commenter !'}
               </p>
             ) : (
               filteredComments.map(c => (
-                <div key={c.commentId} className="bg-white border border-slate-200/80 rounded-xl p-2.5 text-xs shadow-xs space-y-1">
+                <div key={c.commentId} className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 rounded-xl p-2.5 text-xs shadow-xs space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 text-[#0F2942] font-black flex items-center justify-center text-[10px] overflow-hidden shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-950 text-[#0F2942] dark:text-blue-300 font-black flex items-center justify-center text-[10px] overflow-hidden shrink-0">
                         {c.userAvatar ? (
                           <img src={c.userAvatar} alt={c.userName} className="w-full h-full object-cover" />
                         ) : (
                           c.userName.charAt(0)
                         )}
                       </div>
-                      <span className="font-bold text-slate-900 truncate max-w-[140px]">{c.userName}</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-[140px]">{c.userName}</span>
                     </div>
-                    <span className="text-[9px] text-slate-400 shrink-0">{c.createdAt}</span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 shrink-0">{c.createdAt}</span>
                   </div>
-                  <p className="text-slate-700 text-xs leading-relaxed pl-8">{c.content}</p>
+                  <p className="text-slate-700 dark:text-slate-300 text-xs leading-relaxed pl-8">{c.content}</p>
                 </div>
               ))
             )}
@@ -2887,12 +3081,12 @@ function ProviderProfileModal({
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
                 placeholder={isAr ? 'اكتب تعليقاً أو رأياً...' : 'Écrire un commentaire ou un avis...'}
-                className="w-full bg-white border border-slate-300 rounded-xl pl-3 pr-10 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-all shadow-xs"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-3 pr-10 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-all shadow-xs"
               />
               <button
                 type="submit"
                 disabled={!commentInput.trim()}
-                className="absolute right-1.5 p-1.5 bg-[#0F2942] hover:bg-[#1E3A8A] disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                className="absolute right-1.5 p-1.5 bg-[#0F2942] dark:bg-blue-600 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 text-white disabled:text-slate-400 dark:disabled:text-slate-500 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed shadow-xs"
                 title={isAr ? 'نشر التعليق' : 'Envoyer'}
                 aria-label={isAr ? 'نشر' : 'Envoyer'}
               >
@@ -2907,8 +3101,8 @@ function ProviderProfileModal({
                 onClick={onToggleLike}
                 className={`px-3 py-2.5 rounded-xl border flex items-center gap-1.5 transition-all duration-200 cursor-pointer shrink-0 shadow-xs active:scale-95 select-none ${
                   isLiked
-                    ? 'bg-red-50 border-red-300 text-red-600 shadow-sm'
-                    : 'bg-white border-slate-300 text-slate-600 hover:text-red-500 hover:border-red-200 hover:bg-red-50/50'
+                    ? 'bg-red-50 dark:bg-red-950/60 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 shadow-sm'
+                    : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:border-red-200 hover:bg-red-50/50 dark:hover:bg-red-950/40'
                 }`}
                 title={isLiked ? (isAr ? 'إلغاء الإعجاب بالخدمة' : 'Je n’aime plus') : (isAr ? 'أعجبتني هذه الخدمة' : 'J’aime ce service')}
                 aria-label={isLiked ? 'Je n’aime plus' : 'J’aime ce service'}
@@ -2917,10 +3111,10 @@ function ProviderProfileModal({
                   className={`w-5 h-5 transition-transform duration-200 ${
                     isLiked
                       ? 'fill-red-600 text-red-600 scale-110 drop-shadow-[0_1px_3px_rgba(220,38,38,0.4)] animate-pulse'
-                      : 'text-slate-400 hover:text-red-500'
+                      : 'text-slate-400 dark:text-slate-500 hover:text-red-500'
                   }`}
                 />
-                <span className={`text-xs font-black ${isLiked ? 'text-red-600' : 'text-slate-700'}`}>
+                <span className={`text-xs font-black ${isLiked ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
                   {effectiveLikesCount}
                 </span>
               </button>
@@ -2929,26 +3123,26 @@ function ProviderProfileModal({
         </div>
 
         {/* Customer reviews */}
-        <div className="space-y-2 pt-2 border-t">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
             {isAr ? `تقييمات الزبناء المعتمدة (${reviews.length})` : `Avis vérifiés (${reviews.length})`}
           </h4>
           {reviews.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">
+            <p className="text-xs text-slate-400 dark:text-slate-500 italic">
               {isAr ? 'لا توجد تقييمات مسجلة بعد لهذا الملف.' : 'Aucun avis enregistré pour l’instant.'}
             </p>
           ) : (
             reviews.map(r => (
-              <div key={r.reviewId} className="bg-slate-50 p-2.5 rounded-xl text-xs space-y-1">
+              <div key={r.reviewId} className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl text-xs space-y-1">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-800">{r.clientName}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100">{r.clientName}</span>
                   <div className="flex text-amber-400">
                     {Array.from({ length: r.rating }).map((_, i) => (
                       <Star key={i} className="w-3 h-3 fill-amber-400 stroke-none" />
                     ))}
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-600">{r.comment}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">{r.comment}</p>
               </div>
             ))
           )}
@@ -2956,7 +3150,7 @@ function ProviderProfileModal({
 
         <button 
           onClick={onDirectContact}
-          className="w-full bg-[#0F2942] text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#1E3A8A] cursor-pointer shadow-md"
+          className="w-full bg-[#0F2942] dark:bg-blue-600 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 cursor-pointer shadow-md"
         >
           <MessageSquare className="w-4 h-4" />
           <span>{isAr ? 'مراسلة وتواصل مباشر' : 'Contacter par message'}</span>
@@ -2966,9 +3160,6 @@ function ProviderProfileModal({
   );
 }
 
-/* --------------------------------------------------------------------------
-   REQUEST DETAIL MODAL
-   -------------------------------------------------------------------------- */
 /* --------------------------------------------------------------------------
    REQUEST DETAIL MODAL
    -------------------------------------------------------------------------- */
@@ -2999,63 +3190,63 @@ function RequestDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
-        <div className="flex justify-between items-center border-b pb-3">
-          <h3 className="text-sm font-bold text-slate-800">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl border border-transparent dark:border-slate-800">
+        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
             {isAr ? 'تفاصيل طلب الزبون' : 'Détail de la demande client'}
           </h3>
           <button onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Fermer'} className="cursor-pointer">
-            <XCircle className="w-5 h-5 text-slate-400" />
+            <XCircle className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" />
           </button>
         </div>
 
         <div>
-          <span className="text-[10px] font-bold text-[#2563EB] uppercase">
+          <span className="text-[10px] font-bold text-[#2563EB] dark:text-blue-400 uppercase">
             {getCategoryTranslation(request.category as any, language).name} • {getCityTranslation(request.city as any, language)}
           </span>
-          <h2 className="text-base font-extrabold text-[#0F2942] mt-0.5">{request.title}</h2>
-          <p className="text-xs text-slate-600 mt-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <h2 className="text-base font-extrabold text-[#0F2942] dark:text-white mt-0.5">{request.title}</h2>
+          <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
             {request.description}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">
-            <span className="text-[10px] text-emerald-800 font-bold block">
+          <div className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-800/60 p-2.5 rounded-xl">
+            <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold block">
               {isAr ? 'الميزانية التقديرية' : 'Budget estimé'}
             </span>
-            <span className="font-black text-emerald-700 text-sm">{request.budget} {isAr ? 'درهم' : 'MAD'}</span>
+            <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm">{request.budget} {isAr ? 'درهم' : 'MAD'}</span>
           </div>
-          <div className="bg-blue-50 border border-blue-100 p-2.5 rounded-xl">
-            <span className="text-[10px] text-blue-800 font-bold block">
+          <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-800/60 p-2.5 rounded-xl">
+            <span className="text-[10px] text-blue-800 dark:text-blue-300 font-bold block">
               {isAr ? 'الأجل المطلوب' : 'Délai souhaité'}
             </span>
-            <span className="font-bold text-blue-700 text-xs">{request.preferredDate}</span>
+            <span className="font-bold text-blue-700 dark:text-blue-300 text-xs">{request.preferredDate}</span>
           </div>
         </div>
 
         {/* Proposals List */}
-        <div className="space-y-2 pt-2 border-t">
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
             {isAr ? `العروض المستلمة (${proposals.length})` : `Offres reçues (${proposals.length})`}
           </h4>
           {proposals.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">
+            <p className="text-xs text-slate-400 dark:text-slate-500 italic">
               {isAr ? 'لا توجد عروض مقدمة على هذا الطلب حتى الآن.' : 'Aucune offre déposée pour le moment.'}
             </p>
           ) : (
             proposals.map(prop => (
-              <div key={prop.proposalId} className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+              <div key={prop.proposalId} className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs space-y-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 min-w-0">
                     {prop.providerAvatar ? (
-                      <img src={prop.providerAvatar} alt={prop.providerName} className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0" />
+                      <img src={prop.providerAvatar} alt={prop.providerName} className="w-6 h-6 rounded-full object-cover border border-slate-200 dark:border-slate-600 shrink-0" />
                     ) : null}
-                    <span className="font-bold text-slate-800 truncate">{prop.providerName}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{prop.providerName}</span>
                   </div>
-                  <span className="text-sm font-black text-[#0F2942] shrink-0">{prop.proposedPrice} {isAr ? 'درهم' : 'MAD'}</span>
+                  <span className="text-sm font-black text-[#0F2942] dark:text-emerald-400 shrink-0">{prop.proposedPrice} {isAr ? 'درهم' : 'MAD'}</span>
                 </div>
-                <p className="text-[11px] text-slate-600 italic">"{prop.message}"</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 italic">"{prop.message}"</p>
 
                 {isOwner && prop.status === 'pending' && (
                   <button 
@@ -3067,7 +3258,7 @@ function RequestDetailModal({
                   </button>
                 )}
                 {prop.status === 'accepted' && (
-                  <div className="text-center font-bold text-emerald-700 text-[11px] bg-emerald-100 py-1.5 rounded-lg border border-emerald-200">
+                  <div className="text-center font-bold text-emerald-700 dark:text-emerald-300 text-[11px] bg-emerald-100 dark:bg-emerald-950/60 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
                     {isAr ? 'تم قبول العرض • المهمة قيد التنفيذ' : 'Offre acceptée • Mission en cours'}
                   </div>
                 )}
@@ -3078,11 +3269,11 @@ function RequestDetailModal({
 
         {/* Proposal Form for Prestataire */}
         {!isOwner && currentUser?.accountType === 'prestataire' && (
-          <div className="pt-2 border-t">
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
             {!showOfferForm ? (
               <button 
                 onClick={() => setShowOfferForm(true)}
-                className="w-full bg-[#0F2942] hover:bg-[#1E3A8A] text-white py-3 rounded-xl text-xs font-bold cursor-pointer shadow-md"
+                className="w-full bg-[#0F2942] dark:bg-blue-600 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 text-white py-3 rounded-xl text-xs font-bold cursor-pointer shadow-md"
               >
                 {isAr ? 'تقديم عرض أسعار بالدرهم (MAD)' : 'Proposer un devis chiffré (MAD)'}
               </button>
@@ -3092,49 +3283,49 @@ function RequestDetailModal({
                   e.preventDefault();
                   onSendProposal(offerPrice, offerMsg, offerEta);
                 }}
-                className="space-y-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200"
+                className="space-y-3 bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700"
               >
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                    <label className="text-[10px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
                       {isAr ? 'السعر المقترح (درهم)' : 'Prix proposé (MAD)'}
                     </label>
                     <input 
                       type="number" 
                       value={offerPrice} 
                       onChange={e => setOfferPrice(Number(e.target.value))}
-                      className="w-full p-2 text-xs bg-white border rounded-lg"
+                      className="w-full p-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg"
                       required
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                    <label className="text-[10px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
                       {isAr ? 'الأجل المقدر' : 'Délai estimé'}
                     </label>
                     <input 
                       type="text" 
                       value={offerEta} 
                       onChange={e => setOfferEta(e.target.value)}
-                      className="w-full p-2 text-xs bg-white border rounded-lg"
+                      className="w-full p-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg"
                       required
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                  <label className="text-[10px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
                     {isAr ? 'رسالتك وضماناتك للزبون' : 'Message au client'}
                   </label>
                   <textarea 
                     value={offerMsg} 
                     onChange={e => setOfferMsg(e.target.value)}
                     placeholder={isAr ? 'اذكر خبرتك وضمانات الجودة والالتزام بالوقت...' : 'Détaillez vos garanties et votre méthodologie...'}
-                    className="w-full p-2 text-xs bg-white border rounded-lg"
+                    className="w-full p-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg"
                     rows={2}
                     required
                   />
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setShowOfferForm(false)} className="flex-1 py-2 text-xs bg-slate-200 hover:bg-slate-300 rounded-lg font-bold cursor-pointer">
+                  <button type="button" onClick={() => setShowOfferForm(false)} className="flex-1 py-2 text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg font-bold cursor-pointer">
                     {isAr ? 'إلغاء' : 'Annuler'}
                   </button>
                   <button type="submit" className="flex-1 py-2 text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer">
@@ -3233,20 +3424,25 @@ function ChatWindowModal({
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-          onSendMessage(isAr ? `موقعي الجغرافي: ${lat.toFixed(4)}, ${lng.toFixed(4)}` : `Position GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'location', mapUrl);
+          onSendMessage(isAr ? `موقعي الحالي: ${lat.toFixed(4)}, ${lng.toFixed(4)}` : `Position GPS actuelle: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'location', mapUrl);
         },
-        () => {
-          onSendMessage(isAr ? 'موقع فاس، المغرب' : 'Fès, Maroc', 'location', 'https://www.google.com/maps?q=34.0331,-5.0003');
-        }
+        (err) => {
+          alert(isAr ? 'تعذر تحديد موقعك الجغرافي. يجدر التأكد من تفعيل GPS.' : 'Impossible d’obtenir votre position GPS. Vérifiez que la localisation est activée.');
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } else {
-      onSendMessage('Fès, Maroc', 'location', 'https://www.google.com/maps?q=34.0331,-5.0003');
+      alert(isAr ? 'خدمة تحديد الموقع غير متوفرة على هذا المتصفح.' : 'La géolocalisation n’est pas supportée par votre navigateur.');
     }
     setShowAttachMenu(false);
   };
 
   const startVoiceNote = async () => {
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        alert(isAr ? 'التسجيل الصوتي غير مدعوم على متصفحك.' : 'L’enregistrement audio n’est pas supporté par votre navigateur.');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
@@ -3261,7 +3457,7 @@ function ChatWindowModal({
         const reader = new FileReader();
         reader.onload = () => {
           const audioBase64 = reader.result as string;
-          onSendMessage(isAr ? 'تسجيل صوتي' : 'Message vocal', 'audio', audioBase64, 'voice_note.webm');
+          onSendMessage(isAr ? 'تسجيل صوتي حقيقي' : 'Message vocal (Enregistré)', 'audio', audioBase64, 'voice_note.webm');
         };
         reader.readAsDataURL(audioBlob);
         stream.getTracks().forEach(t => t.stop());
@@ -3269,11 +3465,9 @@ function ChatWindowModal({
 
       recorder.start();
       setRecordingAudio(true);
-    } catch {
-      setTimeout(() => {
-        onSendMessage(isAr ? 'تسجيل صوتي' : 'Message vocal', 'audio', '', 'voice.webm');
-        setRecordingAudio(false);
-      }, 1500);
+    } catch (err: any) {
+      alert(isAr ? 'تعذر الوصول إلى الميكروفون. يجدر السماح بالإذن في المتصفح.' : 'Accès au microphone refusé ou non autorisé.');
+      setRecordingAudio(false);
     }
   };
 
@@ -3285,9 +3479,9 @@ function ChatWindowModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col max-w-md mx-auto shadow-2xl animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="fixed inset-0 z-50 bg-white dark:bg-slate-900 flex flex-col max-w-md mx-auto shadow-2xl animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Header */}
-      <div className="bg-[#0F2942] text-white px-4 py-3 flex items-center justify-between shadow-md">
+      <div className="bg-[#0F2942] dark:bg-slate-950 text-white px-4 py-3 flex items-center justify-between shadow-md border-b border-transparent dark:border-slate-800">
         <div className="flex items-center gap-3">
           <button onClick={onClose} aria-label={isAr ? 'رجوع' : 'Retour'} className="cursor-pointer">
             <ArrowLeft className={`w-5 h-5 text-slate-300 ${isAr ? 'rotate-180' : ''}`} />
@@ -3358,9 +3552,9 @@ function ChatWindowModal({
       )}
 
       {/* Messages Feed */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950">
         {messages.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 text-xs">
+          <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-xs">
             {isAr ? 'لا توجد رسائل بعد. ابدأ المحادثة الآن أو أرسل مرفقاً!' : 'Aucun message. Envoyez le premier mot ou un fichier !'}
           </div>
         ) : (
@@ -3370,7 +3564,7 @@ function ChatWindowModal({
             return (
               <div key={m.messageId} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs shadow-sm ${
-                  isMe ? 'bg-[#2563EB] text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
+                  isMe ? 'bg-[#2563EB] text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-bl-none'
                 }`}>
                   {m.type === 'image' && m.mediaUrl ? (
                     <div className="mb-2 rounded-xl overflow-hidden max-h-48 border border-white/20">
@@ -3470,7 +3664,7 @@ function ChatWindowModal({
 
       {/* Attachment Popup Menu */}
       {showAttachMenu && (
-        <div className="mx-3 mb-2 p-3 bg-white border border-slate-200 rounded-2xl shadow-xl grid grid-cols-4 gap-2 animate-fadeIn text-center">
+        <div className="mx-3 mb-2 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl grid grid-cols-4 gap-2 animate-fadeIn text-center">
           <input
             ref={fileInputRef}
             type="file"
@@ -3489,7 +3683,7 @@ function ChatWindowModal({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center p-2 bg-blue-50 hover:bg-blue-100 rounded-xl text-[#2563EB] text-[11px] font-bold cursor-pointer"
+            className="flex flex-col items-center p-2 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/70 rounded-xl text-[#2563EB] dark:text-blue-300 text-[11px] font-bold cursor-pointer"
           >
             <Camera className="w-5 h-5 mb-1" />
             <span>{isAr ? 'صورة/فيديو' : 'Photo/Vidéo'}</span>
@@ -3498,7 +3692,7 @@ function ChatWindowModal({
           <button
             type="button"
             onClick={() => docInputRef.current?.click()}
-            className="flex flex-col items-center p-2 bg-purple-50 hover:bg-purple-100 rounded-xl text-purple-700 text-[11px] font-bold cursor-pointer"
+            className="flex flex-col items-center p-2 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/70 rounded-xl text-purple-700 dark:text-purple-300 text-[11px] font-bold cursor-pointer"
           >
             <FileText className="w-5 h-5 mb-1" />
             <span>{isAr ? 'مستند/ملف' : 'Document'}</span>
@@ -3507,7 +3701,7 @@ function ChatWindowModal({
           <button
             type="button"
             onClick={shareGpsLocation}
-            className="flex flex-col items-center p-2 bg-emerald-50 hover:bg-emerald-100 rounded-xl text-emerald-700 text-[11px] font-bold cursor-pointer"
+            className="flex flex-col items-center p-2 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 rounded-xl text-emerald-700 dark:text-emerald-300 text-[11px] font-bold cursor-pointer"
           >
             <Map className="w-5 h-5 mb-1" />
             <span>{isAr ? 'الموقع' : 'Position'}</span>
@@ -3524,7 +3718,9 @@ function ChatWindowModal({
               }
             }}
             className={`flex flex-col items-center p-2 rounded-xl text-[11px] font-bold cursor-pointer ${
-              recordingAudio ? 'bg-rose-500 text-white animate-pulse' : 'bg-amber-50 hover:bg-amber-100 text-amber-700'
+              recordingAudio
+                ? 'bg-rose-500 text-white animate-pulse'
+                : 'bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/70 text-amber-700 dark:text-amber-300'
             }`}
           >
             <Mic className="w-5 h-5 mb-1" />
@@ -3535,20 +3731,20 @@ function ChatWindowModal({
 
       {/* Editing Indicator Bar */}
       {editingMsg && (
-        <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 flex items-center justify-between gap-2 text-xs">
+        <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/60 border-t border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2 min-w-0">
-            <Pencil className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <Pencil className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div className="min-w-0">
-              <span className="text-[10px] font-extrabold text-amber-800 block">
+              <span className="text-[10px] font-extrabold text-amber-800 dark:text-amber-300 block">
                 {isAr ? 'تعديل الرسالة' : 'Modification du message'}
               </span>
-              <span className="text-[11px] text-amber-900/80 truncate block">{editingMsg.content}</span>
+              <span className="text-[11px] text-amber-900/80 dark:text-amber-200/80 truncate block">{editingMsg.content}</span>
             </div>
           </div>
           <button
             type="button"
             onClick={cancelEdit}
-            className="p-1 text-amber-700 hover:bg-amber-200/70 rounded-lg cursor-pointer"
+            className="p-1 text-amber-700 dark:text-amber-300 hover:bg-amber-200/70 dark:hover:bg-amber-900/70 rounded-lg cursor-pointer"
             aria-label={isAr ? 'إلغاء التعديل' : 'Annuler'}
           >
             <X className="w-4 h-4" />
@@ -3569,16 +3765,16 @@ function ChatWindowModal({
             setInputText('');
           }
         }}
-        className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+        className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2"
       >
         <button
           type="button"
           onClick={() => setShowAttachMenu(!showAttachMenu)}
-          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors cursor-pointer shrink-0"
+          className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-colors cursor-pointer shrink-0"
           title={isAr ? 'إرفاق ملف أو وسائط' : 'Joindre un fichier ou média'}
           aria-label={isAr ? 'إرفاق' : 'Joindre'}
         >
-          <Paperclip className="w-4 h-4 text-[#2563EB]" />
+          <Paperclip className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
         </button>
 
         <input 
@@ -3590,12 +3786,12 @@ function ChatWindowModal({
               ? (isAr ? 'عدّل نص الرسالة...' : 'Modifiez votre message...')
               : (isAr ? 'اكتب رسالتك هنا أو أرفق ملفاً...' : 'Écrivez votre message ou joignez un fichier...')
           }
-          className="flex-1 bg-slate-100 border-none rounded-xl px-3.5 py-2 text-xs focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+          className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border-none rounded-xl px-3.5 py-2 text-xs focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
         />
         <button 
           type="submit" 
           className={`p-2 rounded-xl text-white transition-colors cursor-pointer shrink-0 ${
-            editingMsg ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0F2942] hover:bg-[#2563EB]'
+            editingMsg ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0F2942] dark:bg-blue-600 hover:bg-[#2563EB] dark:hover:bg-blue-700'
           }`}
           aria-label={editingMsg ? (isAr ? 'حفظ التعديل' : 'Enregistrer') : (isAr ? 'إرسال' : 'Envoyer')}
         >
@@ -3666,13 +3862,15 @@ function PublishModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
-        <div className="flex justify-between items-center border-b pb-3">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl border border-transparent dark:border-slate-800">
+        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
           <div className="flex gap-2">
             <button 
               onClick={() => setMode('service')}
               className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                mode === 'service' ? 'bg-[#0F2942] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                mode === 'service'
+                  ? 'bg-[#0F2942] dark:bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               {isAr ? 'عرض خدمة مهنية' : 'Proposer un Service'}
@@ -3680,20 +3878,22 @@ function PublishModal({
             <button 
               onClick={() => setMode('request')}
               className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                mode === 'request' ? 'bg-[#2563EB] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                mode === 'request'
+                  ? 'bg-[#2563EB] text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               {isAr ? 'نشر طلب خدمة' : 'Publier une Demande'}
             </button>
           </div>
           <button onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Fermer'} className="cursor-pointer">
-            <XCircle className="w-5 h-5 text-slate-400" />
+            <XCircle className="w-5 h-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
               {isAr ? 'عنوان الإعلان أو الطلب' : "Titre de l'annonce"}
             </label>
             <input 
@@ -3705,20 +3905,20 @@ function PublishModal({
                   ? (isAr ? "مثال: سباك محترف وإصلاح التدفئة فاس" : "Ex: Plombier chauffagiste certifié Fès") 
                   : (isAr ? "مثال: مطلوب صباغ لغرفة وصالون 25م²" : "Ex: Recherche peintre pour salon 25m²")
               }
-              className="w-full text-xs p-2.5 bg-slate-50 border rounded-xl focus:bg-white focus:outline-none"
+              className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:outline-none"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
                 {isAr ? 'القسم' : 'Catégorie'}
               </label>
               <select 
                 value={category} 
                 onChange={e => setCategory(e.target.value as ServiceCategory)}
-                className="w-full text-xs p-2 bg-slate-50 border rounded-xl cursor-pointer"
+                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer"
               >
                 {SERVICE_CATEGORIES.map(c => (
                   <option key={c.name} value={c.name}>
@@ -3728,13 +3928,13 @@ function PublishModal({
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
                 {isAr ? 'المدينة' : 'Ville'}
               </label>
               <select 
                 value={city} 
                 onChange={e => setCity(e.target.value as MoroccanCity)}
-                className="w-full text-xs p-2 bg-slate-50 border rounded-xl cursor-pointer"
+                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer"
               >
                 {MOROCCAN_CITIES.map(c => (
                   <option key={c} value={c}>
@@ -3747,7 +3947,7 @@ function PublishModal({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
                 {mode === 'service' 
                   ? (isAr ? 'السعر (درهم)' : 'Tarif (MAD)') 
                   : (isAr ? 'الميزانية التقديرية (درهم)' : 'Budget estimé (MAD)')}
@@ -3756,20 +3956,20 @@ function PublishModal({
                 type="number" 
                 value={price} 
                 onChange={e => setPrice(Number(e.target.value))}
-                className="w-full text-xs p-2.5 bg-slate-50 border rounded-xl"
+                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl"
                 required
               />
             </div>
             <div>
               {mode === 'service' ? (
                 <>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
                     {isAr ? 'طريقة التسعير' : 'Type de tarif'}
                   </label>
                   <select 
                     value={pricingType} 
                     onChange={e => setPricingType(e.target.value as any)}
-                    className="w-full text-xs p-2 bg-slate-50 border rounded-xl cursor-pointer"
+                    className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer"
                   >
                     <option value="Fixe">{isAr ? 'سعر ثابت' : 'Prix Fixe'}</option>
                     <option value="Par heure">{isAr ? 'بالساعة' : 'Par heure'}</option>
@@ -3778,7 +3978,7 @@ function PublishModal({
                 </>
               ) : (
                 <>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
                     {isAr ? 'الأجل المفضل' : 'Délai souhaité'}
                   </label>
                   <input 
@@ -3786,7 +3986,7 @@ function PublishModal({
                     value={preferredDate} 
                     onChange={e => setPreferredDate(e.target.value)}
                     placeholder={isAr ? "مثال: عاجل اليوم" : "Ex: Urgent aujourd'hui"}
-                    className="w-full text-xs p-2.5 bg-slate-50 border rounded-xl"
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl"
                   />
                 </>
               )}
@@ -3794,7 +3994,7 @@ function PublishModal({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
               {isAr ? 'الوصف والتفاصيل' : 'Description complète'}
             </label>
             <textarea 
@@ -3802,14 +4002,14 @@ function PublishModal({
               onChange={e => setDescription(e.target.value)}
               placeholder={isAr ? 'اذكر المهارات، الأدوات، أو شروط المهمة بالتفصيل...' : "Détaillez les compétences, l'outillage ou les détails de la mission..."}
               rows={3}
-              className="w-full text-xs p-2.5 bg-slate-50 border rounded-xl focus:bg-white"
+              className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800"
               required
             />
           </div>
 
           <button 
             type="submit" 
-            className="w-full bg-[#0F2942] hover:bg-[#1E3A8A] text-white py-3 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+            className="w-full bg-[#0F2942] dark:bg-blue-600 hover:bg-[#1E3A8A] dark:hover:bg-blue-700 text-white py-3 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
           >
             {mode === 'service' 
               ? (isAr ? 'حفظ ونشر الخدمة في Wasta No' : 'Enregistrer le service dans Firestore') 
@@ -3841,27 +4041,27 @@ function SubmitReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl border border-transparent dark:border-slate-800">
         <div className="text-center space-y-1">
-          <h3 className="text-sm font-bold text-slate-800">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
             {isAr ? 'تقييم الخدمة المنجزة' : 'Évaluer la prestation'}
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {isAr ? 'لصالح ' : 'Pour '}
-            <span className="font-bold text-[#0F2942]">{targetUser.fullName}</span>
+            <span className="font-bold text-[#0F2942] dark:text-white">{targetUser.fullName}</span>
           </p>
         </div>
 
         <div className="flex justify-center gap-2 py-2">
           {[1, 2, 3, 4, 5].map(s => (
             <button key={s} type="button" onClick={() => setStars(s)} className="cursor-pointer">
-              <Star className={`w-7 h-7 ${s <= stars ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+              <Star className={`w-7 h-7 ${s <= stars ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}`} />
             </button>
           ))}
         </div>
 
         <div>
-          <label className="text-xs font-bold text-slate-700 block mb-1">
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
             {isAr ? 'رأيك الصادق في العمل' : 'Votre avis sincère'}
           </label>
           <textarea 
@@ -3869,13 +4069,13 @@ function SubmitReviewModal({
             onChange={e => setComment(e.target.value)}
             placeholder={isAr ? 'جودة العمل، الالتزام بالوقت، احترام السعر المتفق عليه...' : 'Qualité, respect du devis en MAD, ponctualité...'}
             rows={3}
-            className="w-full text-xs p-2.5 bg-slate-50 border rounded-xl"
+            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl"
             required
           />
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 text-xs bg-slate-100 hover:bg-slate-200 rounded-xl font-bold cursor-pointer">
+          <button onClick={onClose} className="flex-1 py-2 text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold cursor-pointer">
             {isAr ? 'إلغاء' : 'Annuler'}
           </button>
           <button 

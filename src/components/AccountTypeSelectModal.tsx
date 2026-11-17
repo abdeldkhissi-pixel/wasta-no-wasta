@@ -24,15 +24,20 @@ export const AccountTypeSelectModal: React.FC<AccountTypeSelectModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-6 space-y-5 shadow-2xl border border-slate-100">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-6 space-y-5 shadow-2xl border border-slate-100 dark:border-slate-800">
         
         {/* Header */}
         <div className="flex items-center justify-between">
-          <WastaLogo size="sm" showSlogan={false} language={language} />
+          <div className="dark:hidden">
+            <WastaLogo size="sm" showSlogan={false} language={language} />
+          </div>
+          <div className="hidden dark:block">
+            <WastaLogo size="sm" showSlogan={false} inverted language={language} />
+          </div>
           {onClose && (
             <button 
               onClick={onClose} 
-              className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               aria-label={isAr ? "إغلاق" : "Fermer"}
             >
               <X className="w-5 h-5" />
@@ -41,10 +46,10 @@ export const AccountTypeSelectModal: React.FC<AccountTypeSelectModalProps> = ({
         </div>
 
         <div className="text-center space-y-1.5 pt-1">
-          <h2 className="text-xl font-black text-[#0F2942] tracking-tight">
+          <h2 className="text-xl font-black text-[#0F2942] dark:text-white tracking-tight">
             {isAr ? 'مرحباً بك في واسطة لا' : 'Bienvenue sur Wasta No'}
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             {isAr ? 'كيف ترغب في استخدام تطبيقنا؟' : 'Comment souhaitez-vous utiliser notre application ?'}
           </p>
         </div>
@@ -54,20 +59,20 @@ export const AccountTypeSelectModal: React.FC<AccountTypeSelectModalProps> = ({
           {/* OPTION 1: PARTICULIER */}
           <div 
             onClick={() => onSelectType('particulier')}
-            className="p-5 rounded-3xl border-2 border-blue-200/90 bg-gradient-to-br from-blue-50/70 to-slate-50 hover:border-[#2563EB] hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+            className="p-5 rounded-3xl border-2 border-blue-200/90 dark:border-blue-800/70 bg-gradient-to-br from-blue-50/70 to-slate-50 dark:from-slate-800 dark:to-slate-900 hover:border-[#2563EB] hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3"
           >
             <div className="flex items-start gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-[#0F2942] text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
                 <User className="w-6 h-6 text-blue-300" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold text-[#2563EB] uppercase tracking-wider block">
+                <span className="text-[10px] font-extrabold text-[#2563EB] dark:text-blue-400 uppercase tracking-wider block">
                   {isAr ? 'الخيار 1' : 'Option 1'}
                 </span>
-                <h3 className="text-sm font-black text-slate-900 mt-0.5">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white mt-0.5">
                   {isAr ? 'زبون (باحث عن خدمة)' : 'Particulier (Client)'}
                 </h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
                   {isAr 
                     ? 'تبحث عن حرفي مؤهل، مهني متخصص أو طالب موهوب لإنجاز أشغالك وتلبية احتياجاتك.'
                     : 'Vous recherchez un professionnel ou un service pour répondre à vos besoins.'}
@@ -81,7 +86,7 @@ export const AccountTypeSelectModal: React.FC<AccountTypeSelectModalProps> = ({
                 e.stopPropagation();
                 onSelectType('particulier');
               }}
-              className="w-full py-2.5 px-4 bg-[#0F2942] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-[#1E3A8A] transition-colors shadow-sm cursor-pointer"
+              className="w-full py-2.5 px-4 bg-[#0F2942] dark:bg-[#2563EB] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 group-hover:bg-[#1E3A8A] transition-colors shadow-sm cursor-pointer"
             >
               <span>{isAr ? 'المتابعة كزبون باحث عن خدمات' : 'Continuer en tant que particulier'}</span>
               {isAr ? <ArrowLeft className="w-4 h-4 text-emerald-400" /> : <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />}
@@ -91,20 +96,20 @@ export const AccountTypeSelectModal: React.FC<AccountTypeSelectModalProps> = ({
           {/* OPTION 2: PRESTATAIRE */}
           <div 
             onClick={() => onSelectType('prestataire')}
-            className="p-5 rounded-3xl border-2 border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 to-slate-50 hover:border-emerald-600 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+            className="p-5 rounded-3xl border-2 border-emerald-200/90 dark:border-emerald-800/70 bg-gradient-to-br from-emerald-50/70 to-slate-50 dark:from-slate-800 dark:to-slate-900 hover:border-emerald-600 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3"
           >
             <div className="flex items-start gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
                 <Briefcase className="w-6 h-6 text-emerald-200" />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider block">
+                <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
                   {isAr ? 'الخيار 2' : 'Option 2'}
                 </span>
-                <h3 className="text-sm font-black text-slate-900 mt-0.5">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white mt-0.5">
                   {isAr ? 'مهني وحرفي ومقدم خدمات' : 'Prestataire de services'}
                 </h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
                   {isAr
                     ? 'ترغب في عرض مهاراتك، نشر أسعار خدماتك وجلب زبناء جدد بانتظام في مدينتك.'
                     : 'Vous souhaitez proposer vos compétences, publier vos services et trouver des clients.'}
@@ -127,12 +132,12 @@ export const AccountTypeSelectModal: React.FC<AccountTypeSelectModalProps> = ({
         </div>
 
         {/* Existing account link */}
-        <div className="pt-2 text-center border-t border-slate-100">
-          <p className="text-xs text-slate-500">
+        <div className="pt-2 text-center border-t border-slate-100 dark:border-slate-800">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {isAr ? 'هل لديك حساب بالفعل؟ ' : 'Vous avez déjà un compte ? '}
             <button
               onClick={onGoToLogin}
-              className="font-bold text-[#2563EB] hover:underline cursor-pointer"
+              className="font-bold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer"
             >
               {isAr ? 'تسجيل الدخول' : 'Se connecter'}
             </button>

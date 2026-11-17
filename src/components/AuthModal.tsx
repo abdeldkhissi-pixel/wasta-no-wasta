@@ -478,14 +478,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
-      <div ref={modalScrollRef} className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100">
+      <div ref={modalScrollRef} className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100 dark:border-slate-800">
         
         {/* Top Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <WastaLogo size="sm" showSlogan={false} language={language} />
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="dark:hidden">
+            <WastaLogo size="sm" showSlogan={false} language={language} />
+          </div>
+          <div className="hidden dark:block">
+            <WastaLogo size="sm" showSlogan={false} inverted language={language} />
+          </div>
           <button 
             onClick={onClose} 
-            className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label={isAr ? "إغلاق" : "Fermer"}
           >
             <X className="w-5 h-5" />
@@ -494,11 +499,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Tab switchers */}
         {mode !== 'forgot' ? (
-          <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+          <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
             <button
               onClick={() => { setMode('login'); setErrorMsg(null); setSuccessMsg(null); setIsOperationNotAllowed(false); }}
               className={`py-2 rounded-lg transition-all cursor-pointer ${
-                mode === 'login' ? 'bg-white text-[#0F2942] shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                mode === 'login' ? 'bg-white dark:bg-slate-900 text-[#0F2942] dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               {isAr ? 'تسجيل الدخول' : 'Se connecter'}
@@ -506,7 +511,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               onClick={() => { setMode('signup'); setErrorMsg(null); setSuccessMsg(null); setIsOperationNotAllowed(false); }}
               className={`py-2 rounded-lg transition-all cursor-pointer ${
-                mode === 'signup' ? 'bg-white text-[#0F2942] shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                mode === 'signup' ? 'bg-white dark:bg-slate-900 text-[#0F2942] dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               {isAr ? 'إنشاء حساب جديد' : 'Créer un compte'}
@@ -514,12 +519,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
               {isAr ? 'استرجاع كلمة المرور' : 'Mot de passe oublié'}
             </h3>
             <button 
               onClick={() => { setMode('login'); setErrorMsg(null); setSuccessMsg(null); setIsOperationNotAllowed(false); }}
-              className="text-xs text-[#2563EB] font-bold hover:underline cursor-pointer"
+              className="text-xs text-[#2563EB] dark:text-blue-400 font-bold hover:underline cursor-pointer"
             >
               {isAr ? 'العودة لتسجيل الدخول' : 'Retour à la connexion'}
             </button>
@@ -528,23 +533,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Feedback alerts */}
         {errorMsg && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex flex-col gap-2">
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 rounded-xl text-xs flex flex-col gap-2">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <span className="leading-snug">{errorMsg}</span>
             </div>
 
             {/* If operation-not-allowed, show step-by-step guidance */}
             {isOperationNotAllowed && (
-              <div className="mt-1 pt-2 border-t border-rose-200 text-[11px] text-slate-700 bg-white/80 p-2.5 rounded-lg space-y-1.5">
-                <span className="font-bold text-slate-900 block">
+              <div className="mt-1 pt-2 border-t border-rose-200 dark:border-rose-800 text-[11px] text-slate-700 dark:text-slate-300 bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg space-y-1.5">
+                <span className="font-bold text-slate-900 dark:text-white block">
                   {isAr ? 'تفعيل البريد الإلكتروني في Firebase :' : 'Comment activer Email/Mot de passe dans Firebase :'}
                 </span>
-                <ol className="list-decimal list-inside space-y-1 text-slate-600">
+                <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400">
                   <li>
                     {isAr 
-                      ? <>افتح لوحة تحكم Firebase للمشروع <b className="text-slate-800 font-mono">singular-vim-701dl</b>.</>
-                      : <>Ouvrez la console Firebase du projet <b className="text-slate-800 font-mono">singular-vim-701dl</b>.</>}
+                      ? <>افتح لوحة تحكم Firebase للمشروع <b className="text-slate-800 dark:text-slate-200 font-mono">singular-vim-701dl</b>.</>
+                      : <>Ouvrez la console Firebase du projet <b className="text-slate-800 dark:text-slate-200 font-mono">singular-vim-701dl</b>.</>}
                   </li>
                   <li>
                     {isAr
@@ -562,7 +567,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     href="https://console.firebase.google.com/project/singular-vim-701dl/authentication/providers"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[#2563EB] font-bold hover:underline text-xs"
+                    className="inline-flex items-center gap-1 text-[#2563EB] dark:text-blue-400 font-bold hover:underline text-xs"
                   >
                     <span>{isAr ? 'فتح صفحة المصادقة في Firebase' : 'Ouvrir la page Authentication Firebase'}</span>
                     <ExternalLink className="w-3 h-3" />
@@ -574,8 +579,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {successMsg && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-xl text-xs flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             <span className="leading-snug font-semibold">{successMsg}</span>
           </div>
         )}
@@ -587,7 +592,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
-              className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 px-4 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded-xl text-xs font-bold flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
             >
               {googleLoading ? (
                 <>
@@ -608,8 +613,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
 
             <div className="relative flex items-center justify-center">
-              <div className="w-full border-t border-slate-200"></div>
-              <span className="absolute bg-white px-2 text-[10px] uppercase font-bold text-slate-400">
+              <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+              <span className="absolute bg-white dark:bg-slate-900 px-2 text-[10px] uppercase font-bold text-slate-400">
                 {isAr ? 'أو عبر البريد الإلكتروني' : 'ou avec email'}
               </span>
             </div>
@@ -620,7 +625,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {mode === 'login' && (
           <form onSubmit={handleLogin} noValidate className="space-y-3.5 pt-1">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'البريد الإلكتروني' : 'Adresse Email'}
               </label>
               <div className="relative">
@@ -630,20 +635,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder={isAr ? "barid@mithal.ma" : "votre.email@exemple.ma"}
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                 />
               </div>
             </div>
 
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-bold text-slate-700">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   {isAr ? 'كلمة المرور' : 'Mot de passe'}
                 </label>
                 <button 
                   type="button" 
                   onClick={() => { setMode('forgot'); setErrorMsg(null); setSuccessMsg(null); }}
-                  className="text-[11px] text-[#2563EB] font-bold hover:underline cursor-pointer"
+                  className="text-[11px] text-[#2563EB] dark:text-blue-400 font-bold hover:underline cursor-pointer"
                 >
                   {isAr ? 'نسيت كلمة المرور؟' : 'Mot de passe oublié ?'}
                 </button>
@@ -655,12 +660,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer`}
+                  className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer`}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -670,7 +675,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#0F2942] hover:bg-[#1E3A8A] text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 bg-[#0F2942] dark:bg-[#2563EB] hover:bg-[#1E3A8A] dark:hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -683,7 +688,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
 
             <div className="text-center pt-2">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isAr ? 'ليس لديك حساب بعد؟ ' : "Vous n'avez pas encore de compte ? "}
                 <button
                   type="button"
@@ -694,7 +699,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setMode('signup');
                     }
                   }}
-                  className="font-bold text-[#2563EB] hover:underline cursor-pointer"
+                  className="font-bold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer"
                 >
                   {isAr ? 'إنشاء حساب جديد' : 'Créer un compte'}
                 </button>
@@ -709,14 +714,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* Interactive Account Type Selector */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-700">
+                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                   {isAr ? 'اختر نوع الحساب' : 'Type de compte'}
                 </span>
                 {onOpenAccountTypeSelect && (
                   <button
                     type="button"
                     onClick={onOpenAccountTypeSelect}
-                    className="text-[11px] font-bold text-[#2563EB] hover:underline cursor-pointer"
+                    className="text-[11px] font-bold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer"
                   >
                     {isAr ? 'عرض التفاصيل' : 'Changer'}
                   </button>
@@ -728,11 +733,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   onClick={() => setAccountType('particulier')}
                   className={`p-2.5 rounded-xl border-2 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     accountType === 'particulier'
-                      ? 'bg-blue-50 border-[#2563EB] text-[#0F2942] shadow-xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-blue-50 dark:bg-blue-950/60 border-[#2563EB] text-[#0F2942] dark:text-blue-200 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <User className={`w-3.5 h-3.5 ${accountType === 'particulier' ? 'text-[#2563EB]' : 'text-slate-400'}`} />
+                  <User className={`w-3.5 h-3.5 ${accountType === 'particulier' ? 'text-[#2563EB] dark:text-blue-400' : 'text-slate-400'}`} />
                   <span>{isAr ? 'زبون' : 'Particulier'}</span>
                 </button>
                 <button
@@ -740,18 +745,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   onClick={() => setAccountType('prestataire')}
                   className={`p-2.5 rounded-xl border-2 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     accountType === 'prestataire'
-                      ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-600 text-emerald-900 dark:text-emerald-200 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <Briefcase className={`w-3.5 h-3.5 ${accountType === 'prestataire' ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <Briefcase className={`w-3.5 h-3.5 ${accountType === 'prestataire' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
                   <span>{isAr ? 'مقدم خدمات' : 'Prestataire'}</span>
                 </button>
               </div>
             </div>
 
             {/* Profile Photo Upload */}
-            <div className="flex flex-col items-center justify-center py-2 bg-slate-50/70 rounded-2xl border border-slate-200/80">
+            <div className="flex flex-col items-center justify-center py-2 bg-slate-50/70 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700">
               <input
                 ref={photoInputRef}
                 type="file"
@@ -764,7 +769,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={photoUploading}
-                  className="w-20 h-20 rounded-full bg-white border-2 border-dashed border-slate-300 hover:border-[#2563EB] flex items-center justify-center overflow-hidden shadow-sm transition-all cursor-pointer group"
+                  className="w-20 h-20 rounded-full bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-[#2563EB] flex items-center justify-center overflow-hidden shadow-sm transition-all cursor-pointer group"
                   aria-label={isAr ? 'إضافة صورة شخصية' : 'Ajouter une photo de profil'}
                 >
                   {photoUploading ? (
@@ -795,7 +800,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#2563EB] hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white cursor-pointer"
+                    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#2563EB] hover:bg-blue-700 text-white flex items-center justify-center shadow-md border-2 border-white dark:border-slate-900 cursor-pointer"
                     aria-label={isAr ? 'اختيار صورة' : 'Choisir une photo'}
                   >
                     <Camera className="w-3.5 h-3.5" />
@@ -805,7 +810,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
-                className="mt-1.5 text-[11px] font-bold text-[#2563EB] hover:underline cursor-pointer"
+                className="mt-1.5 text-[11px] font-bold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer"
               >
                 {profileImage
                   ? (isAr ? 'تغيير الصورة الشخصية' : 'Changer la photo de profil')
@@ -814,7 +819,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'الاسم الكامل' : 'Nom complet'}
               </label>
               <div className="relative">
@@ -824,14 +829,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   placeholder={isAr ? "مثال: عمر برادة" : "Ex: Omar Berrada"}
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'البريد الإلكتروني' : 'Adresse Email'}
               </label>
               <div className="relative">
@@ -841,7 +846,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder={isAr ? "barid@mithal.ma" : "votre.email@exemple.ma"}
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                   required
                 />
               </div>
@@ -849,7 +854,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                   {isAr ? 'الهاتف (اختياري)' : 'Téléphone (Optionnel)'}
                 </label>
                 <div className="relative">
@@ -859,13 +864,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
                     placeholder="06 12 34 56 78"
-                    className={`w-full text-xs ${isAr ? 'pr-8 pl-2.5 text-right' : 'pl-8 pr-2.5 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none`}
+                    className={`w-full text-xs ${isAr ? 'pr-8 pl-2.5 text-right' : 'pl-8 pr-2.5 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                   {isAr ? 'المدينة' : 'Ville'}
                 </label>
                 <div className="relative">
@@ -873,7 +878,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <select
                     value={city}
                     onChange={e => setCity(e.target.value as MoroccanCity)}
-                    className={`w-full text-xs ${isAr ? 'pr-8 pl-2 text-right' : 'pl-8 pr-2 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none font-medium`}
+                    className={`w-full text-xs ${isAr ? 'pr-8 pl-2 text-right' : 'pl-8 pr-2 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none font-medium`}
                   >
                     {MOROCCAN_CITIES.map(c => (
                       <option key={c} value={c}>{getCityTranslation(c, language)}</option>
@@ -884,7 +889,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'كلمة المرور' : 'Mot de passe'}
               </label>
               <div className="relative">
@@ -894,13 +899,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder={isAr ? "6 أحرف على الأقل" : "Au moins 6 caractères"}
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer`}
+                  className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer`}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -908,7 +913,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'تأكيد كلمة المرور' : 'Confirmer le mot de passe'}
               </label>
               <div className="relative">
@@ -918,13 +923,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder={isAr ? "أعد إدخال كلمة المرور" : "Répétez le mot de passe"}
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer`}
+                  className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer`}
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -941,7 +946,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="mt-0.5 rounded text-[#2563EB] focus:ring-0 cursor-pointer"
                 required
               />
-              <label htmlFor="terms" className="text-[11px] text-slate-600 leading-tight cursor-pointer">
+              <label htmlFor="terms" className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight cursor-pointer">
                 {isAr 
                   ? 'أوافق على الشروط والأحكام العامة وسياسة الخصوصية لمنصة واسطة لا المغرب.'
                   : "J'accepte les conditions générales d'utilisation et la politique de confidentialité de Wasta No Maroc."}
@@ -952,7 +957,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               type="submit"
               disabled={loading}
               className={`w-full py-3 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
-                accountType === 'prestataire' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0F2942] hover:bg-[#1E3A8A]'
+                accountType === 'prestataire' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0F2942] dark:bg-[#2563EB] hover:bg-[#1E3A8A] dark:hover:bg-blue-700'
               }`}
             >
               {loading ? (
@@ -970,12 +975,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
 
             <div className="text-center pt-1">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isAr ? 'هل لديك حساب بالفعل؟ ' : 'Vous avez déjà un compte ? '}
                 <button
                   type="button"
                   onClick={() => { setMode('login'); setErrorMsg(null); setSuccessMsg(null); }}
-                  className="font-bold text-[#2563EB] hover:underline cursor-pointer"
+                  className="font-bold text-[#2563EB] dark:text-blue-400 hover:underline cursor-pointer"
                 >
                   {isAr ? 'تسجيل الدخول' : 'Se connecter'}
                 </button>
@@ -987,14 +992,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* ----------------- FORGOT PASSWORD ----------------- */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgotPassword} noValidate className="space-y-3.5 pt-1">
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
               {isAr
                 ? 'أدخل عنوان بريدك الإلكتروني المسجل في واسطة لا. ستتلقى رابطاً آمناً لإعادة تعيين كلمة المرور.'
                 : 'Saisissez l\'adresse email associée à votre compte Wasta No. Vous recevrez un lien pour réinitialiser votre mot de passe en toute sécurité.'}
             </p>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 {isAr ? 'البريد الإلكتروني' : 'Adresse Email'}
               </label>
               <div className="relative">
@@ -1004,7 +1009,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder={isAr ? "barid@mithal.ma" : "votre.email@exemple.ma"}
-                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
+                  className={`w-full text-xs ${isAr ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]`}
                 />
               </div>
             </div>
@@ -1012,7 +1017,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#0F2942] hover:bg-[#1E3A8A] text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 bg-[#0F2942] dark:bg-[#2563EB] hover:bg-[#1E3A8A] dark:hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
